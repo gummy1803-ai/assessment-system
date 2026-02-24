@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 干部考核管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+            background-image: url('背景图.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active, .tab-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            font-size: 1.3em;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        .score-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .score-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .score-item h3 {
+            font-size: 3em;
+            margin: 10px 0;
+        }
+
+        .score-item .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .total-score {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            margin: 2px;
+        }
+
+        .btn-add {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-add:hover {
+            background: #218838;
+        }
+
+        .btn-sub {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-sub:hover {
+            background: #c82333;
+        }
+
+        .btn-edit {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-view {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .btn-submit:hover {
+            transform: scale(1.05);
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        .status-excellent {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-good {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .status-average {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-poor {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 25px;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .detail-item h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .record-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .record-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .record-item:last-child {
+            border-bottom: none;
+        }
+
+        .score-change {
+            font-weight: bold;
+        }
+
+        .score-plus {
+            color: #28a745;
+        }
+
+        .score-minus {
+            color: #dc3545;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            background: #f0f0ff;
+        }
+
+        .upload-area p {
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-item h3 {
+            font-size: 2em;
+            margin: 10px 0;
+        }
+
+        .collapsible-section {
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            padding: 12px 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+
+        .collapsible-header:hover {
+            opacity: 0.9;
+        }
+
+        .collapsible-arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+
+        .collapsible-section.active .collapsible-arrow {
+            transform: rotate(-180deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #f9f9f9;
+        }
+
+        .collapsible-section.active .collapsible-content {
+            max-height: 500px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 干部考核管理系统</h1>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('overview')">📊 总览</button>
+            <button class="tab-btn" onclick="showTab('cadres')">👥 干部管理</button>
+            <button class="tab-btn" onclick="showTab('competition')">🏆 比赛成绩</button>
+            <button class="tab-btn" onclick="showTab('contribution')">🤝 协会贡献</button>
+            <button class="tab-btn" onclick="showTab('equipment')">🔧 设备掌控</button>
+            <button class="tab-btn" onclick="showTab('training')">👨‍🏫 新生指导</button>
+            <button class="tab-btn" onclick="showTab('deduction')">⚠️ 职责扣分</button>
+            </div>
+            
+            <!-- 模式切换和密码控制 -->
+            <div id="modeControls" style="display: flex; gap: 15px; align-items: center;">
+                <div id="modeIndicator" style="font-weight: bold; color: #28a745;">查看模式</div>
+                <button id="switchModeBtn" class="tab-btn" onclick="promptPassword()">切换到编辑模式</button>
+                <button id="changePasswordBtn" class="tab-btn" style="background: #17a2b8;" onclick="showChangePasswordModal()">修改密码</button>
+                <button id="clearDataBtn" class="tab-btn" style="background: #dc3545;" onclick="clearAllData()">清除所有数据</button>
+            </div>
+        </div>
+
+        <!-- 总览页面 -->
+        <div id="overview" class="tab-content active">
+            <h2>📊 考核总览</h2>
+            <div class="dashboard">
+                <div class="card">
+                    <h2>📈 雷达图对比</h2>
+                    
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                            <span>👥 干部选择</span>
+                            <span class="collapsible-arrow">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <input type="text" id="cadreSearch" placeholder="🔍 搜索干部姓名或部门..." oninput="filterCadreOptions()" style="margin-bottom: 10px;">
+                                <div id="cadreSelection" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <button class="btn-submit" onclick="compareSelectedCadres()" style="padding: 10px 20px;">📊 生成对比图</button>
+                                    <button class="btn-submit" onclick="clearChartSelection()" style="padding: 10px 20px; background: #6c757d;">🗑️ 清除选择</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <div id="chartPlaceholder" style="text-align: center; padding: 50px; color: #666;">
+                        <p style="font-size: 18px;">请选择干部查看雷达图</p>
+                        <p style="font-size: 14px; margin-top: 10px;">可选择一个或多个干部进行对比</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>📋 统计概览</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="label">总干部数</div>
+                            <h3 id="totalCadres">0</h3>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">平均总分</div>
+                            <h3 id="avgScore">0</h3>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">优秀干部</div>
+                            <h3 id="excellentCount">0</h3>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">良好干部</div>
+                            <h3 id="goodCount">0</h3>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">一般干部</div>
+                            <h3 id="averageCount">0</h3>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">待改进</div>
+                            <h3 id="poorCount">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <h3 style="margin: 20px 0;">📊 各维度得分分布</h3>
+            <div class="score-display" id="overviewScores">
+            </div>
+        </div>
+
+        <!-- 干部管理页面 -->
+        <div id="cadres" class="tab-content">
+            <h2>👥 干部管理</h2>
+            <div class="form-group">
+                <label>添加/编辑干部</label>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                    <input type="hidden" id="cadreId">
+                    <input type="text" id="cadreName" placeholder="姓名">
+                    <select id="cadreDepartment">
+                        <option value="">选择部门</option>
+                        <option value="赛事部">赛事部</option>
+                        <option value="AI部">AI部</option>
+                        <option value="电控部">电控部</option>
+                        <option value="安监部">安监部</option>
+                        <option value="办公室部">办公室部</option>
+                        <option value="项目部">项目部</option>
+                        <option value="设备部">设备部</option>
+                        <option value="财资部">财资部</option>
+                        <option value="宣传部">宣传部</option>
+                    </select>
+                    <select id="cadrePosition">
+                        <option value="">选择职务</option>
+                        <option value="会长">会长</option>
+                        <option value="副会长">副会长</option>
+                        <option value="部长">部长</option>
+                        <option value="副部长">副部长</option>
+                        <option value="会员">会员</option>
+                    </select>
+                    <input type="text" id="cadreMajor" placeholder="专业">
+                    <input type="text" id="cadreClass" placeholder="班级">
+                    <input type="text" id="cadreGrade" placeholder="级数 (如2025级)">
+                    <button class="btn-submit" onclick="saveCadre()">💾 保存</button>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchCadre" placeholder="搜索干部..." oninput="searchCadres()">
+                <label for="importExcel" class="btn-submit" style="background: #17a2b8; cursor: pointer; padding: 10px 20px; display: inline-block;">📥 导入Excel</label>
+                <input type="file" id="importExcel" accept=".xlsx,.xls" style="display: none;" onchange="importExcelData(this)">
+                <button class="btn-submit" style="background: #6c757d;" onclick="downloadExcelTemplate()">📋 下载模板</button>
+                <button class="btn-submit" style="background: #28a745;" onclick="exportData()">📤 导出数据</button>
+            </div>
+            <table id="cadreTable">
+                <thead>
+                    <tr>
+                        <th>姓名</th>
+                        <th>部门</th>
+                        <th>职务</th>
+                        <th>专业</th>
+                        <th>班级</th>
+                        <th>级数</th>
+                        <th>部门职责</th>
+                        <th>比赛成绩</th>
+                        <th>协会贡献</th>
+                        <th>设备掌控</th>
+                        <th>新生指导</th>
+                        <th>总分</th>
+                        <th>等级</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="cadreTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 比赛成绩页面 -->
+        <div id="competition" class="tab-content">
+            <h2>🏆 比赛成绩录入</h2>
+            <div class="form-group">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <select id="competitionCadre">
+                        <option value="">选择干部</option>
+                    </select>
+                    <select id="competitionLevel">
+                        <option value="">选择比赛级别</option>
+                        <option value="国家级">国家级</option>
+                        <option value="省级">省级</option>
+                        <option value="校级">校级</option>
+                    </select>
+                    <select id="competitionAward">
+                        <option value="">选择奖项</option>
+                        <option value="一等奖">一等奖</option>
+                        <option value="二等奖">二等奖</option>
+                        <option value="三等奖">三等奖</option>
+                    </select>
+                    <input type="text" id="competitionName" placeholder="比赛名称">
+                    <button class="btn-submit" onclick="addCompetition()">➕ 添加成绩</button>
+                </div>
+            </div>
+            <table id="competitionTable">
+                <thead>
+                    <tr>
+                        <th>干部姓名</th>
+                        <th>比赛名称</th>
+                        <th>级别</th>
+                        <th>奖项</th>
+                        <th>加分</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="competitionTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 协会贡献页面 -->
+        <div id="contribution" class="tab-content">
+            <h2>🤝 协会贡献记录</h2>
+            <div class="form-group">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <select id="contributionCadre">
+                        <option value="">选择干部</option>
+                    </select>
+                    <select id="contributionType">
+                        <option value="">选择贡献类型</option>
+                        <option value="卫生">卫生 (+0.1分)</option>
+                        <option value="整理设备">整理设备 (+0.1分)</option>
+                        <option value="维护耗材">维护耗材 (+0.1分)</option>
+                    </select>
+                    <input type="number" id="contributionCount" placeholder="次数" min="1" value="1">
+                    <button class="btn-submit" onclick="addContribution()">➕ 添加贡献</button>
+                </div>
+            </div>
+            <table id="contributionTable">
+                <thead>
+                    <tr>
+                        <th>干部姓名</th>
+                        <th>贡献类型</th>
+                        <th>次数</th>
+                        <th>累计加分</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="contributionTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 设备掌控页面 -->
+        <div id="equipment" class="tab-content">
+            <h2>🔧 设备掌控评分导入</h2>
+            <div class="upload-area" onclick="document.getElementById('excelFile').click()">
+                <p>📁 点击上传Excel文件</p>
+                <p style="font-size: 14px;">支持 .xlsx, .xls 格式</p>
+                <input type="file" id="excelFile" accept=".xlsx,.xls" style="display: none;" onchange="importExcel(event)">
+            </div>
+            <div id="importResult" style="margin: 20px 0;"></div>
+            <table id="equipmentTable">
+                <thead>
+                    <tr>
+                        <th>干部姓名</th>
+                        <th>原始分数</th>
+                        <th>换算后分数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="equipmentTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 新生指导页面 -->
+        <div id="training" class="tab-content">
+            <h2>👨‍🏫 新生指导记录</h2>
+            <div class="form-group">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <select id="trainingCadre">
+                        <option value="">选择干部</option>
+                    </select>
+                    <input type="text" id="traineeName" placeholder="新生姓名">
+                    <input type="number" id="trainingHours" placeholder="培训时长(小时)" min="0.5" step="0.5">
+                    <button class="btn-submit" onclick="addTraining()">➕ 添加记录</button>
+                </div>
+            </div>
+            <table id="trainingTable">
+                <thead>
+                    <tr>
+                        <th>干部姓名</th>
+                        <th>新生姓名</th>
+                        <th>培训时长(小时)</th>
+                        <th>获得积分</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="trainingTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 职责扣分页面 -->
+        <div id="deduction" class="tab-content">
+            <h2>⚠️ 部门职责扣分</h2>
+            <div class="form-group">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <select id="deductionCadre">
+                        <option value="">选择干部</option>
+                    </select>
+                    <input type="number" id="deductionScore" placeholder="扣分分数" min="1">
+                    <input type="text" id="deductionReason" placeholder="扣分原因">
+                    <button class="btn-submit" onclick="addDeduction()">➖ 记录扣分</button>
+                </div>
+            </div>
+            <table id="deductionTable">
+                <thead>
+                    <tr>
+                        <th>干部姓名</th>
+                        <th>扣分原因</th>
+                        <th>扣分</th>
+                        <th>剩余分数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="deductionTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">干部详情</h2>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- 密码修改弹窗 -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeChangePasswordModal()">&times;</span>
+            <h2>修改密码</h2>
+            <div class="form-group">
+                <label for="currentPassword">当前密码</label>
+                <input type="password" id="currentPassword" placeholder="请输入当前密码" required>
+            </div>
+            <div class="form-group">
+                <label for="newPassword">新密码</label>
+                <input type="password" id="newPassword" placeholder="请输入新密码" required>
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">确认新密码</label>
+                <input type="password" id="confirmPassword" placeholder="请再次输入新密码" required>
+            </div>
+            <button class="btn-submit" onclick="changePassword()">确认修改</button>
+        </div>
+    </div>
+
+    <script>
+        // 服务器配置
+        const SERVER_URL = 'http://192.168.1.19:3000/api';
+        let syncEnabled = true; // 是否启用同步功能
+        let lastSyncTime = localStorage.getItem('lastSyncTime') || null;
+
+        // 数据存储
+        let cadres = JSON.parse(localStorage.getItem('cadres')) || [];
+        let competitions = JSON.parse(localStorage.getItem('competitions')) || [];
+        let contributions = JSON.parse(localStorage.getItem('contributions')) || [];
+        let trainings = JSON.parse(localStorage.getItem('trainings')) || [];
+        let deductions = JSON.parse(localStorage.getItem('deductions')) || [];
+
+        // 模式和权限控制
+        let currentMode = 'view'; // 'view' 或 'edit'
+        let adminPassword = localStorage.getItem('adminPassword') || '123456';
+
+        let radarChart = null;
+
+        function initChart() {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['部门职责', '比赛成绩', '协会贡献', '设备掌控', '新生指导'],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 1000,
+                            ticks: {
+                                stepSize: 200
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleCollapsible(header) {
+            const section = header.parentElement;
+            section.classList.toggle('active');
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+            refreshAllTables();
+        }
+
+        function refreshAllTables() {
+            updateCadreTable();
+            updateCompetitionTable();
+            updateContributionTable();
+            updateTrainingTable();
+            updateDeductionTable();
+            updateOverview();
+            updateDropdowns();
+        }
+
+        function updateDropdowns() {
+            const options = cadres.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            document.getElementById('competitionCadre').innerHTML = '<option value="">选择干部</option>' + options;
+            document.getElementById('contributionCadre').innerHTML = '<option value="">选择干部</option>' + options;
+            document.getElementById('trainingCadre').innerHTML = '<option value="">选择干部</option>' + options;
+            document.getElementById('deductionCadre').innerHTML = '<option value="">选择干部</option>' + options;
+        }
+
+        function calculateCadreScore(cadreId) {
+            const cadre = cadres.find(c => c.id === cadreId);
+            if (!cadre) return { department: 0, competition: 0, contribution: 0, equipment: 0, training: 0, total: 0 };
+
+            const compScore = competitions
+                .filter(c => c.cadreId === cadreId)
+                .reduce((sum, c) => sum + c.score, 0);
+
+            const contribScore = contributions
+                .filter(c => c.cadreId === cadreId)
+                .reduce((sum, c) => sum + c.totalScore, 0);
+
+            const trainScore = trainings
+                .filter(t => t.cadreId === cadreId)
+                .reduce((sum, t) => sum + t.score, 0);
+
+            const deductionScore = deductions
+                .filter(d => d.cadreId === cadreId)
+                .reduce((sum, d) => sum + d.score, 0);
+
+            const deptScore = 1000 - deductionScore;
+            const equipScore = cadre.equipmentScore || 0;
+
+            return {
+                department: Math.max(0, deptScore),
+                competition: compScore,
+                contribution: contribScore,
+                equipment: equipScore,
+                training: trainScore,
+                total: Math.max(0, deptScore) + compScore + contribScore + equipScore + trainScore
+            };
+        }
+
+        function getLevel(total) {
+            if (total >= 1800) return { text: '优秀', class: 'status-excellent' };
+            if (total >= 1400) return { text: '良好', class: 'status-good' };
+            if (total >= 1000) return { text: '一般', class: 'status-average' };
+            return { text: '待改进', class: 'status-poor' };
+        }
+
+        function updateOverview() {
+            if (cadres.length === 0) {
+                document.getElementById('totalCadres').textContent = '0';
+                document.getElementById('avgScore').textContent = '0';
+                document.getElementById('excellentCount').textContent = '0';
+                document.getElementById('goodCount').textContent = '0';
+                document.getElementById('averageCount').textContent = '0';
+                document.getElementById('poorCount').textContent = '0';
+                document.getElementById('overviewScores').innerHTML = '';
+                document.getElementById('cadreSelection').innerHTML = '<p style="color: #999;">暂无干部数据</p>';
+                radarChart.data.datasets = [];
+                radarChart.update();
+                return;
+            }
+
+            let totalScore = 0;
+            let excellent = 0, good = 0, average = 0, poor = 0;
+
+            cadres.forEach(cadre => {
+                const score = calculateCadreScore(cadre.id);
+                totalScore += score.total;
+                const level = getLevel(score.total).text;
+                if (level === '优秀') excellent++;
+                else if (level === '良好') good++;
+                else if (level === '一般') average++;
+                else poor++;
+            });
+
+            document.getElementById('totalCadres').textContent = cadres.length;
+            document.getElementById('avgScore').textContent = (totalScore / cadres.length).toFixed(1);
+            document.getElementById('excellentCount').textContent = excellent;
+            document.getElementById('goodCount').textContent = good;
+            document.getElementById('averageCount').textContent = average;
+            document.getElementById('poorCount').textContent = poor;
+
+            renderCadreSelection();
+            updateRadarChartWithSelection();
+
+            let deptSum = 0, compSum = 0, contribSum = 0, equipSum = 0, trainSum = 0;
+            cadres.forEach(cadre => {
+                const score = calculateCadreScore(cadre.id);
+                deptSum += score.department;
+                compSum += score.competition;
+                contribSum += score.contribution;
+                equipSum += score.equipment;
+                trainSum += score.training;
+            });
+
+            const avg = cadres.length;
+            document.getElementById('overviewScores').innerHTML = `
+                <div class="score-item">
+                    <div class="label">部门职责平均</div>
+                    <h3>${(deptSum / avg).toFixed(1)}</h3>
+                </div>
+                <div class="score-item">
+                    <div class="label">比赛成绩平均</div>
+                    <h3>${(compSum / avg).toFixed(1)}</h3>
+                </div>
+                <div class="score-item">
+                    <div class="label">协会贡献平均</div>
+                    <h3>${(contribSum / avg).toFixed(1)}</h3>
+                </div>
+                <div class="score-item">
+                    <div class="label">设备掌控平均</div>
+                    <h3>${(equipSum / avg).toFixed(1)}</h3>
+                </div>
+                <div class="score-item total-score">
+                    <div class="label">新生指导平均</div>
+                    <h3>${(trainSum / avg).toFixed(1)}</h3>
+                </div>
+            `;
+        }
+
+        function renderCadreSelection() {
+            const container = document.getElementById('cadreSelection');
+            const searchTerm = document.getElementById('cadreSearch').value.toLowerCase();
+            
+            const filteredCadres = cadres.filter(cadre => 
+                cadre.name.toLowerCase().includes(searchTerm) ||
+                (cadre.department && cadre.department.toLowerCase().includes(searchTerm))
+            );
+
+            if (filteredCadres.length === 0) {
+                container.innerHTML = '<p style="color: #999;">未找到匹配的干部</p>';
+                return;
+            }
+
+            container.innerHTML = filteredCadres.map(cadre => `
+                <label style="display: flex; align-items: center; padding: 8px; cursor: pointer; border-radius: 5px; margin: 5px 0; transition: background 0.2s;" 
+                       onmouseover="this.style.background='#f0f0f0'" 
+                       onmouseout="this.style.background='transparent'">
+                    <input type="checkbox" value="${cadre.id}" class="cadre-checkbox" style="margin-right: 10px; width: 18px; height: 18px;">
+                    <span>${cadre.name}</span>
+                    <span style="color: #999; margin-left: 10px; font-size: 0.9em;">(${cadre.department || '未分配部门'})</span>
+                </label>
+            `).join('');
+        }
+
+        function filterCadreOptions() {
+            renderCadreSelection();
+        }
+
+        function getSelectedCadreIds() {
+            const checkboxes = document.querySelectorAll('.cadre-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function updateRadarChartWithSelection() {
+            const selectedIds = getSelectedCadreIds();
+            
+            if (selectedIds.length === 0) {
+                document.getElementById('chartPlaceholder').style.display = 'block';
+                radarChart.data.datasets = [];
+                radarChart.update();
+                return;
+            }
+
+            document.getElementById('chartPlaceholder').style.display = 'none';
+
+            const colors = [
+                { bg: 'rgba(102, 126, 234, 0.2)', border: 'rgba(102, 126, 234, 1)' },
+                { bg: 'rgba(118, 75, 162, 0.2)', border: 'rgba(118, 75, 162, 1)' },
+                { bg: 'rgba(40, 167, 69, 0.2)', border: 'rgba(40, 167, 69, 1)' },
+                { bg: 'rgba(220, 53, 69, 0.2)', border: 'rgba(220, 53, 69, 1)' },
+                { bg: 'rgba(0, 123, 255, 0.2)', border: 'rgba(0, 123, 255, 1)' },
+                { bg: 'rgba(255, 193, 7, 0.2)', border: 'rgba(255, 193, 7, 1)' },
+                { bg: 'rgba(23, 162, 184, 0.2)', border: 'rgba(23, 162, 184, 1)' },
+                { bg: 'rgba(111, 66, 193, 0.2)', border: 'rgba(111, 66, 193, 1)' },
+                { bg: 'rgba(40, 167, 69, 0.2)', border: 'rgba(40, 167, 69, 1)' },
+                { bg: 'rgba(253, 126, 20, 0.2)', border: 'rgba(253, 126, 20, 1)' }
+            ];
+
+            radarChart.data.datasets = selectedIds.map((id, index) => {
+                const cadre = cadres.find(c => c.id === id);
+                if (!cadre) return null;
+                
+                const score = calculateCadreScore(cadre.id);
+                return {
+                    label: cadre.name,
+                    data: [score.department, score.competition, score.contribution, score.equipment, score.training],
+                    backgroundColor: colors[index % colors.length].bg,
+                    borderColor: colors[index % colors.length].border,
+                    borderWidth: 2,
+                    pointBackgroundColor: colors[index % colors.length].border,
+                    pointRadius: 4
+                };
+            }).filter(ds => ds !== null);
+            
+            radarChart.update();
+        }
+
+        function compareSelectedCadres() {
+            const selectedIds = getSelectedCadreIds();
+            
+            if (selectedIds.length === 0) {
+                alert('请先选择要对比的干部！');
+                return;
+            }
+
+            if (selectedIds.length === 1) {
+                document.getElementById('chartPlaceholder').style.display = 'none';
+            }
+
+            updateRadarChartWithSelection();
+        }
+
+        function clearChartSelection() {
+            const checkboxes = document.querySelectorAll('.cadre-checkbox:checked');
+            checkboxes.forEach(cb => cb.checked = false);
+            document.getElementById('cadreSearch').value = '';
+            renderCadreSelection();
+            document.getElementById('chartPlaceholder').style.display = 'block';
+            radarChart.data.datasets = [];
+            radarChart.update();
+        }
+
+        function updateCadreTable() {
+            const tbody = document.getElementById('cadreTableBody');
+            tbody.innerHTML = '';
+
+            cadres.forEach(cadre => {
+                const score = calculateCadreScore(cadre.id);
+                const level = getLevel(score.total);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre.name}</td>
+                    <td>${cadre.department}</td>
+                    <td>${cadre.position}</td>
+                    <td>${cadre.major || '-'}</td>
+                    <td>${cadre.class || '-'}</td>
+                    <td>${cadre.grade || '-'}</td>
+                    <td>${score.department.toFixed(1)}</td>
+                    <td>${score.competition.toFixed(1)}</td>
+                    <td>${score.contribution.toFixed(1)}</td>
+                    <td>${score.equipment.toFixed(1)}</td>
+                    <td>${score.training.toFixed(1)}</td>
+                    <td style="font-weight: bold; font-size: 1.2em;">${score.total.toFixed(1)}</td>
+                    <td><span class="status ${level.class}">${level.text}</span></td>
+                    <td>
+                        <button class="btn btn-view" onclick="viewDetail('${cadre.id}')">详情</button>
+                        <button class="btn btn-edit" onclick="editCadre('${cadre.id}')">编辑</button>
+                        <button class="btn btn-delete" onclick="deleteCadre('${cadre.id}')">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveCadre() {
+            const id = document.getElementById('cadreId').value || Date.now().toString();
+            const cadre = {
+                id: id,
+                name: document.getElementById('cadreName').value,
+                department: document.getElementById('cadreDepartment').value,
+                position: document.getElementById('cadrePosition').value,
+                major: document.getElementById('cadreMajor').value,
+                class: document.getElementById('cadreClass').value,
+                grade: document.getElementById('cadreGrade').value,
+                equipmentScore: 0
+            };
+
+            const existingIndex = cadres.findIndex(c => c.id === id);
+            if (existingIndex >= 0) {
+                cadres[existingIndex] = { ...cadres[existingIndex], ...cadre };
+            } else {
+                cadres.push(cadre);
+            }
+
+            localStorage.setItem('cadres', JSON.stringify(cadres));
+            refreshAllTables();
+            resetCadreForm();
+            alert('保存成功！');
+        }
+
+        function editCadre(id) {
+            const cadre = cadres.find(c => c.id === id);
+            if (cadre) {
+                document.getElementById('cadreId').value = cadre.id;
+                document.getElementById('cadreName').value = cadre.name || '';
+                document.getElementById('cadreDepartment').value = cadre.department || '';
+                document.getElementById('cadrePosition').value = cadre.position || '';
+                document.getElementById('cadreMajor').value = cadre.major || '';
+                document.getElementById('cadreClass').value = cadre.class || '';
+                document.getElementById('cadreGrade').value = cadre.grade || '';
+            }
+        }
+
+        function deleteCadre(id) {
+            if (confirm('确定要删除该干部吗？')) {
+                cadres = cadres.filter(c => c.id !== id);
+                competitions = competitions.filter(c => c.cadreId !== id);
+                contributions = contributions.filter(c => c.cadreId !== id);
+                trainings = trainings.filter(t => t.cadreId !== id);
+                deductions = deductions.filter(d => d.cadreId !== id);
+                saveAllData();
+                refreshAllTables();
+            }
+        }
+
+        function resetCadreForm() {
+            document.getElementById('cadreId').value = '';
+            document.getElementById('cadreName').value = '';
+            document.getElementById('cadreDepartment').value = '';
+            document.getElementById('cadrePosition').value = '';
+            document.getElementById('cadreMajor').value = '';
+            document.getElementById('cadreClass').value = '';
+            document.getElementById('cadreGrade').value = '';
+        }
+
+        function viewDetail(id) {
+            const cadre = cadres.find(c => c.id === id);
+            if (!cadre) return;
+
+            const score = calculateCadreScore(id);
+            const comps = competitions.filter(c => c.cadreId === id);
+            const contribs = contributions.filter(c => c.cadreId === id);
+            const trains = trainings.filter(t => t.cadreId === id);
+            const deducs = deductions.filter(d => d.cadreId === id);
+
+            document.getElementById('modalTitle').textContent = `${cadre.name} - 考核详情`;
+            document.getElementById('modalContent').innerHTML = `
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <h4>基本信息</h4>
+                        <p>部门: ${cadre.department}</p>
+                        <p>职务: ${cadre.position}</p>
+                        <p>专业: ${cadre.major || '-'}</p>
+                        <p>班级: ${cadre.class || '-'}</p>
+                        <p>级数: ${cadre.grade || '-'}</p>
+                    </div>
+                    <div class="detail-item">
+                        <h4>部门职责</h4>
+                        <p style="font-size: 2em; font-weight: bold; color: #667eea;">${score.department.toFixed(1)}</p>
+                        <p>扣分: ${deducs.reduce((s, d) => s + d.score, 0).toFixed(1)}</p>
+                    </div>
+                    <div class="detail-item">
+                        <h4>比赛成绩</h4>
+                        <p style="font-size: 2em; font-weight: bold; color: #28a745;">${score.competition.toFixed(1)}</p>
+                        <p>获奖次数: ${comps.length}</p>
+                    </div>
+                    <div class="detail-item">
+                        <h4>协会贡献</h4>
+                        <p style="font-size: 2em; font-weight: bold; color: #17a2b8;">${score.contribution.toFixed(1)}</p>
+                    </div>
+                    <div class="detail-item">
+                        <h4>设备掌控</h4>
+                        <p style="font-size: 2em; font-weight: bold; color: #ffc107;">${score.equipment.toFixed(1)}</p>
+                    </div>
+                    <div class="detail-item">
+                        <h4>新生指导</h4>
+                        <p style="font-size: 2em; font-weight: bold; color: #dc3545;">${score.training.toFixed(1)}</p>
+                    </div>
+                </div>
+                <h3 style="margin: 20px 0;">总分: ${score.total.toFixed(1)} - ${getLevel(score.total).text}</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4>比赛记录</h4>
+                        <div class="record-list">
+                            ${comps.map(c => `<div class="record-item">
+                                <span>${c.name} - ${c.level} ${c.award}</span>
+                                <span class="score-change score-plus">+${c.score}</span>
+                            </div>`).join('') || '<p>暂无记录</p>'}
+                        </div>
+                    </div>
+                    <div>
+                        <h4>扣分记录</h4>
+                        <div class="record-list">
+                            ${deducs.map(d => `<div class="record-item">
+                                <span>${d.reason}</span>
+                                <span class="score-change score-minus">-${d.score}</span>
+                            </div>`).join('') || '<p>暂无记录</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('detailModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        // 模式和权限控制函数
+        function promptPassword() {
+            const password = prompt('请输入编辑模式密码：');
+            if (password === adminPassword) {
+                switchToEditMode();
+            } else if (password !== null) {
+                alert('密码错误！');
+            }
+        }
+
+        function switchToEditMode() {
+            currentMode = 'edit';
+            updateModeControls();
+            enableEditControls();
+            alert('已切换到编辑模式！');
+        }
+
+        function switchToViewMode() {
+            currentMode = 'view';
+            updateModeControls();
+            disableEditControls();
+            alert('已切换到查看模式！');
+        }
+
+        function updateModeControls() {
+            const modeIndicator = document.getElementById('modeIndicator');
+            const switchModeBtn = document.getElementById('switchModeBtn');
+            const changePasswordBtn = document.getElementById('changePasswordBtn');
+            const clearDataBtn = document.getElementById('clearDataBtn');
+
+            if (currentMode === 'edit') {
+                modeIndicator.textContent = '编辑模式';
+                modeIndicator.style.color = '#dc3545';
+                switchModeBtn.textContent = '切换到查看模式';
+                switchModeBtn.onclick = switchToViewMode;
+                changePasswordBtn.style.display = 'inline-block';
+                clearDataBtn.style.display = 'inline-block';
+            } else {
+                modeIndicator.textContent = '查看模式';
+                modeIndicator.style.color = '#28a745';
+                switchModeBtn.textContent = '切换到编辑模式';
+                switchModeBtn.onclick = promptPassword;
+                changePasswordBtn.style.display = 'none';
+                clearDataBtn.style.display = 'none';
+            }
+        }
+
+        function showChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'block';
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'none';
+            // 清空表单
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        }
+
+        function changePassword() {
+            const currentPwd = document.getElementById('currentPassword').value;
+            const newPwd = document.getElementById('newPassword').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+
+            if (currentPwd !== adminPassword) {
+                alert('当前密码错误！');
+                return;
+            }
+
+            if (newPwd !== confirmPwd) {
+                alert('两次输入的新密码不一致！');
+                return;
+            }
+
+            if (newPwd.length < 6) {
+                alert('新密码长度不能少于6位！');
+                return;
+            }
+
+            adminPassword = newPwd;
+            localStorage.setItem('adminPassword', adminPassword);
+            
+            // 如果启用了同步，也更新服务器上的密码
+            if (syncEnabled) {
+                updateServerPassword(adminPassword);
+            }
+            
+            closeChangePasswordModal();
+            alert('密码修改成功！');
+        }
+
+        // 更新服务器密码
+        async function updateServerPassword(password) {
+            if (!syncEnabled) return;
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/settings/password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('更新服务器密码失败');
+                }
+                
+                console.log('服务器密码更新成功');
+            } catch (error) {
+                console.error('更新服务器密码错误:', error.message);
+            }
+        }
+
+        // 清除所有数据功能
+        function clearAllData() {
+            if (confirm('确定要清除所有用户数据吗？此操作不可恢复！')) {
+                // 清除所有localStorage数据
+                localStorage.removeItem('cadres');
+                localStorage.removeItem('competitions');
+                localStorage.removeItem('contributions');
+                localStorage.removeItem('trainings');
+                localStorage.removeItem('deductions');
+                localStorage.removeItem('lastSyncTime');
+                
+                // 重置内存中的数据
+                cadres = [];
+                competitions = [];
+                contributions = [];
+                trainings = [];
+                deductions = [];
+                
+                // 刷新所有表格
+                refreshAllTables();
+                
+                // 重置图表
+                radarChart.data.datasets = [];
+                radarChart.update();
+                document.getElementById('chartPlaceholder').style.display = 'block';
+                
+                // 如果启用了同步，也清除服务器上的数据
+                if (syncEnabled) {
+                    clearServerData();
+                }
+                
+                alert('所有用户数据已清除！');
+            }
+        }
+
+        // 数据同步功能
+        
+        // 从服务器下载数据
+        async function syncFromServer() {
+            if (!syncEnabled) return;
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/sync/all`);
+                if (!response.ok) {
+                    throw new Error('服务器响应错误');
+                }
+                
+                const data = await response.json();
+                
+                // 更新本地数据
+                cadres = data.cadres || [];
+                competitions = data.competitions || [];
+                contributions = data.contributions || [];
+                trainings = data.trainings || [];
+                deductions = data.deductions || [];
+                
+                // 保存到localStorage
+                saveAllData();
+                
+                // 更新同步时间
+                lastSyncTime = new Date().toISOString();
+                localStorage.setItem('lastSyncTime', lastSyncTime);
+                
+                // 刷新界面
+                refreshAllTables();
+                
+                console.log('数据从服务器同步成功');
+                return true;
+            } catch (error) {
+                console.error('从服务器同步数据失败:', error.message);
+                return false;
+            }
+        }
+
+        // 上传数据到服务器
+        async function syncToServer() {
+            if (!syncEnabled) return;
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/sync/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cadres,
+                        competitions,
+                        contributions,
+                        trainings,
+                        deductions
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('服务器响应错误');
+                }
+                
+                // 更新同步时间
+                lastSyncTime = new Date().toISOString();
+                localStorage.setItem('lastSyncTime', lastSyncTime);
+                
+                console.log('数据上传到服务器成功');
+                return true;
+            } catch (error) {
+                console.error('上传数据到服务器失败:', error.message);
+                return false;
+            }
+        }
+
+        // 自动同步（先上传本地修改，再下载服务器数据）
+        function startAutoSync() {
+            // 每5分钟同步一次
+            setInterval(async () => {
+                if (syncEnabled) {
+                    // 先上传本地修改，再下载服务器数据（与手动同步逻辑一致）
+                    await syncToServer();
+                    await syncFromServer();
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        // 手动同步（先上传本地修改，再下载服务器最新数据）
+        async function manualSync() {
+            try {
+                // 先上传本地修改
+                const uploadSuccess = await syncToServer();
+                if (uploadSuccess) {
+                    // 再下载服务器最新数据
+                    const downloadSuccess = await syncFromServer();
+                    if (downloadSuccess) {
+                        alert('数据同步完成！');
+                        return true;
+                    }
+                }
+                alert('数据同步失败，请检查网络连接或服务器状态');
+                return false;
+            } catch (error) {
+                console.error('手动同步失败:', error);
+                alert('数据同步失败：' + error.message);
+                return false;
+            }
+        }
+
+        // 清除服务器上的所有数据
+        async function clearServerData() {
+            if (!syncEnabled) return;
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/sync/clear`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('服务器响应错误');
+                }
+                
+                console.log('服务器数据清除成功');
+                return true;
+            } catch (error) {
+                console.error('清除服务器数据失败:', error.message);
+                return false;
+            }
+        }
+
+        // 检查服务器连接状态
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${SERVER_URL}/cadres`);
+                return response.ok;
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // 将常用函数暴露到全局作用域，方便控制台调试
+        window.checkServerStatus = checkServerStatus;
+        window.manualSync = manualSync;
+        window.syncEnabled = syncEnabled;
+        window.SERVER_URL = SERVER_URL;
+
+        function enableEditControls() {
+            // 启用所有编辑按钮
+            document.querySelectorAll('.btn-add, .btn-submit, .btn-edit, .btn-delete, #clearDataBtn').forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            });
+
+            // 启用表单输入
+            document.querySelectorAll('input, select, textarea').forEach(input => {
+                if (!input.hasAttribute('readonly')) {
+                    input.disabled = false;
+                }
+            });
+        }
+
+        function disableEditControls() {
+            // 禁用所有编辑按钮
+            document.querySelectorAll('.btn-add, .btn-submit, .btn-edit, .btn-delete, #clearDataBtn').forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            });
+
+            // 禁用表单输入
+            document.querySelectorAll('input, select, textarea').forEach(input => {
+                if (!input.hasAttribute('readonly')) {
+                    input.disabled = true;
+                }
+            });
+        }
+
+        function searchCadres() {
+            const keyword = document.getElementById('searchCadre').value.toLowerCase();
+            const rows = document.querySelectorAll('#cadreTableBody tr');
+            rows.forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(keyword) ? '' : 'none';
+            });
+        }
+
+        function addCompetition() {
+            const cadreId = document.getElementById('competitionCadre').value;
+            const level = document.getElementById('competitionLevel').value;
+            const award = document.getElementById('competitionAward').value;
+            const name = document.getElementById('competitionName').value;
+
+            if (!cadreId || !level || !award) {
+                alert('请选择干部、比赛级别和奖项！');
+                return;
+            }
+
+            let score = 0;
+            if (level === '国家级') {
+                score = award === '一等奖' ? 300 : award === '二等奖' ? 250 : 200;
+            } else if (level === '省级') {
+                score = award === '一等奖' ? 150 : award === '二等奖' ? 100 : 50;
+            } else {
+                score = award === '一等奖' ? 20 : award === '二等奖' ? 10 : 5;
+            }
+
+            competitions.push({
+                id: Date.now(),
+                cadreId,
+                name,
+                level,
+                award,
+                score
+            });
+
+            localStorage.setItem('competitions', JSON.stringify(competitions));
+            updateCompetitionTable();
+            updateOverview();
+            alert(`添加成功！+${score}分`);
+        }
+
+        function updateCompetitionTable() {
+            const tbody = document.getElementById('competitionTableBody');
+            tbody.innerHTML = '';
+            competitions.forEach((comp, index) => {
+                const cadre = cadres.find(c => c.id === comp.cadreId);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre ? cadre.name : '未知'}</td>
+                    <td>${comp.name}</td>
+                    <td>${comp.level}</td>
+                    <td>${comp.award}</td>
+                    <td style="color: #28a745; font-weight: bold;">+${comp.score}</td>
+                    <td><button class="btn btn-delete" onclick="deleteCompetition(${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteCompetition(index) {
+            competitions.splice(index, 1);
+            localStorage.setItem('competitions', JSON.stringify(competitions));
+            updateCompetitionTable();
+            updateOverview();
+        }
+
+        function addContribution() {
+            const cadreId = document.getElementById('contributionCadre').value;
+            const type = document.getElementById('contributionType').value;
+            const count = parseInt(document.getElementById('contributionCount').value) || 1;
+
+            if (!cadreId || !type) {
+                alert('请选择干部和贡献类型！');
+                return;
+            }
+
+            const totalScore = count * 0.1;
+            contributions.push({
+                id: Date.now(),
+                cadreId,
+                type,
+                count,
+                totalScore
+            });
+
+            localStorage.setItem('contributions', JSON.stringify(contributions));
+            updateContributionTable();
+            updateOverview();
+            alert(`添加成功！+${totalScore}分`);
+        }
+
+        function updateContributionTable() {
+            const tbody = document.getElementById('contributionTableBody');
+            tbody.innerHTML = '';
+            contributions.forEach((contrib, index) => {
+                const cadre = cadres.find(c => c.id === contrib.cadreId);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre ? cadre.name : '未知'}</td>
+                    <td>${contrib.type}</td>
+                    <td>${contrib.count}</td>
+                    <td style="color: #28a745; font-weight: bold;">+${contrib.totalScore.toFixed(1)}</td>
+                    <td><button class="btn btn-delete" onclick="deleteContribution(${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteContribution(index) {
+            contributions.splice(index, 1);
+            localStorage.setItem('contributions', JSON.stringify(contributions));
+            updateContributionTable();
+            updateOverview();
+        }
+
+        function importExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                let importCount = 0;
+                const tbody = document.getElementById('equipmentTableBody');
+                tbody.innerHTML = '';
+
+                jsonData.forEach(row => {
+                    const name = row['姓名'] || row['name'] || Object.values(row)[0];
+                    const score = row['分数'] || row['score'] || row['设备掌控'] || Object.values(row)[1];
+
+                    if (name && score !== undefined) {
+                        const convertedScore = (parseFloat(score) / 100) * 1000;
+                        const cadre = cadres.find(c => c.name === name);
+                        if (cadre) {
+                            cadre.equipmentScore = convertedScore;
+                        }
+
+                        importCount++;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${name}</td>
+                            <td>${score}</td>
+                            <td style="color: #667eea; font-weight: bold;">${convertedScore.toFixed(1)}</td>
+                            <td>${cadre ? '已更新' : '未找到干部'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                });
+
+                localStorage.setItem('cadres', JSON.stringify(cadres));
+                document.getElementById('importResult').innerHTML = `<p style="color: #28a745;">✅ 成功导入 ${importCount} 条记录</p>`;
+                updateOverview();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function updateEquipmentTable() {
+            const tbody = document.getElementById('equipmentTableBody');
+            tbody.innerHTML = '';
+            cadres.forEach(cadre => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre.name}</td>
+                    <td>-</td>
+                    <td style="color: #667eea; font-weight: bold;">${(cadre.equipmentScore || 0).toFixed(1)}</td>
+                    <td><button class="btn btn-edit" onclick="updateEquipmentManual('${cadre.id}')">手动设置</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateEquipmentManual(id) {
+            const cadre = cadres.find(c => c.id === id);
+            if (cadre) {
+                const score = prompt(`请输入${cadre.name}的设备掌控分数（0-100）:`, cadre.equipmentScore ? cadre.equipmentScore / 10 : 0);
+                if (score !== null) {
+                    cadre.equipmentScore = (parseFloat(score) || 0) * 10;
+                    localStorage.setItem('cadres', JSON.stringify(cadres));
+                    updateEquipmentTable();
+                    updateOverview();
+                }
+            }
+        }
+
+        function addTraining() {
+            const cadreId = document.getElementById('trainingCadre').value;
+            const traineeName = document.getElementById('traineeName').value;
+            const hours = parseFloat(document.getElementById('trainingHours').value) || 0;
+
+            if (!cadreId || !traineeName || hours <= 0) {
+                alert('请填写完整信息！');
+                return;
+            }
+
+            const score = hours * 0.5;
+            trainings.push({
+                id: Date.now(),
+                cadreId,
+                traineeName,
+                hours,
+                score
+            });
+
+            localStorage.setItem('trainings', JSON.stringify(trainings));
+            updateTrainingTable();
+            updateOverview();
+            alert(`添加成功！+${score}分`);
+        }
+
+        function updateTrainingTable() {
+            const tbody = document.getElementById('trainingTableBody');
+            tbody.innerHTML = '';
+            trainings.forEach((train, index) => {
+                const cadre = cadres.find(c => c.id === train.cadreId);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre ? cadre.name : '未知'}</td>
+                    <td>${train.traineeName}</td>
+                    <td>${train.hours}</td>
+                    <td style="color: #28a745; font-weight: bold;">+${train.score.toFixed(1)}</td>
+                    <td><button class="btn btn-delete" onclick="deleteTraining(${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteTraining(index) {
+            trainings.splice(index, 1);
+            localStorage.setItem('trainings', JSON.stringify(trainings));
+            updateTrainingTable();
+            updateOverview();
+        }
+
+        function addDeduction() {
+            const cadreId = document.getElementById('deductionCadre').value;
+            const score = parseFloat(document.getElementById('deductionScore').value) || 0;
+            const reason = document.getElementById('deductionReason').value;
+
+            if (!cadreId || score <= 0) {
+                alert('请选择干部并输入扣分分数！');
+                return;
+            }
+
+            deductions.push({
+                id: Date.now(),
+                cadreId,
+                score,
+                reason
+            });
+
+            localStorage.setItem('deductions', JSON.stringify(deductions));
+            updateDeductionTable();
+            updateOverview();
+            alert(`扣分成功！-${score}分`);
+        }
+
+        function updateDeductionTable() {
+            const tbody = document.getElementById('deductionTableBody');
+            tbody.innerHTML = '';
+            deductions.forEach((ded, index) => {
+                const cadre = cadres.find(c => c.id === ded.cadreId);
+                const currentScore = calculateCadreScore(ded.cadreId).department;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${cadre ? cadre.name : '未知'}</td>
+                    <td>${ded.reason || '未说明原因'}</td>
+                    <td style="color: #dc3545; font-weight: bold;">-${ded.score}</td>
+                    <td>${currentScore.toFixed(1)}</td>
+                    <td><button class="btn btn-delete" onclick="deleteDeduction(${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteDeduction(index) {
+            deductions.splice(index, 1);
+            localStorage.setItem('deductions', JSON.stringify(deductions));
+            updateDeductionTable();
+            updateOverview();
+        }
+
+        function importExcelData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                    if (jsonData.length === 0) {
+                        alert('Excel文件为空或格式不正确！');
+                        return;
+                    }
+
+                    let successCount = 0;
+                    const requiredFields = ['姓名', '部门'];
+
+                    jsonData.forEach(row => {
+                        const missingFields = requiredFields.filter(field => !row[field]);
+                        if (missingFields.length > 0) {
+                            console.warn(`缺少必要字段: ${missingFields.join(', ')}`);
+                            return;
+                        }
+
+                        const cadre = {
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            name: row['姓名'] || '',
+                            department: row['部门'] || '',
+                            position: row['职务'] || '',
+                            major: row['专业'] || '',
+                            class: row['班级'] || '',
+                            grade: row['级数'] || '',
+                            equipmentScore: 0
+                        };
+
+                        cadres.push(cadre);
+                        successCount++;
+                    });
+
+                    localStorage.setItem('cadres', JSON.stringify(cadres));
+                    refreshAllTables();
+                    input.value = '';
+                    
+                    if (successCount > 0) {
+                        alert(`成功导入 ${successCount} 条干部数据！`);
+                    } else {
+                        alert('未能导入任何数据，请检查Excel格式是否正确。\n必要字段：姓名、部门\n可选字段：职务、专业、班级、级数');
+                    }
+                } catch (error) {
+                    console.error('导入错误:', error);
+                    alert('导入失败，请确保Excel文件格式正确！');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function downloadExcelTemplate() {
+            const templateData = [
+                {
+                    '姓名': '示例：张三',
+                    '部门': '赛事部',
+                    '职务': '部长',
+                    '专业': '计算机科学',
+                    '班级': '1班',
+                    '级数': '2024级'
+                },
+                {
+                    '姓名': '示例：李四',
+                    '部门': 'AI部',
+                    '职务': '副会长',
+                    '专业': '人工智能',
+                    '班级': '2班',
+                    '级数': '2024级'
+                }
+            ];
+
+            const ws = XLSX.utils.json_to_sheet(templateData);
+            const wsCols = [
+                { wch: 15 },
+                { wch: 12 },
+                { wch: 10 },
+                { wch: 15 },
+                { wch: 10 },
+                { wch: 10 }
+            ];
+            ws['!cols'] = wsCols;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '干部信息');
+
+            XLSX.writeFile(wb, '干部信息导入模板.xlsx');
+        }
+
+        function exportData() {
+            let csv = '姓名,部门,职务,专业,班级,级数,部门职责,比赛成绩,协会贡献,设备掌控,新生指导,总分,等级\n';
+            cadres.forEach(cadre => {
+                const score = calculateCadreScore(cadre.id);
+                const level = getLevel(score.total).text;
+                csv += `${cadre.name},${cadre.department},${cadre.position},${cadre.major || ''},${cadre.class || ''},${cadre.grade || ''},${score.department.toFixed(1)},${score.competition.toFixed(1)},${score.contribution.toFixed(1)},${score.equipment.toFixed(1)},${score.training.toFixed(1)},${score.total.toFixed(1)},${level}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '干部考核数据.csv';
+            link.click();
+        }
+
+        function saveAllData() {
+            localStorage.setItem('cadres', JSON.stringify(cadres));
+            localStorage.setItem('competitions', JSON.stringify(competitions));
+            localStorage.setItem('contributions', JSON.stringify(contributions));
+            localStorage.setItem('trainings', JSON.stringify(trainings));
+            localStorage.setItem('deductions', JSON.stringify(deductions));
+            
+            // 如果启用了同步，自动上传到服务器
+            if (syncEnabled) {
+                syncToServer();
+            }
+        }
+
+        window.onclick = function(event) {
+            const detailModal = document.getElementById('detailModal');
+            const passwordModal = document.getElementById('changePasswordModal');
+            
+            if (event.target == detailModal) {
+                closeModal();
+            } else if (event.target == passwordModal) {
+                closeChangePasswordModal();
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            refreshAllTables();
+            // 初始化模式控制
+            updateModeControls();
+            disableEditControls();
+            
+            // 检查服务器状态并同步数据
+            (async function() {
+                const isConnected = await checkServerStatus();
+                if (isConnected) {
+                    // 服务器连接正常，同步数据
+                    console.log('服务器连接正常，开始同步数据...');
+                    await syncFromServer();
+                    // 启动自动同步
+                    startAutoSync();
+                } else {
+                    console.log('服务器连接失败，使用本地数据');
+                }
+            })();
+        });
+    </script>
+</body>
+</html>
