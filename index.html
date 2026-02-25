@@ -474,6 +474,7 @@
                 <button id="switchModeBtn" class="tab-btn" onclick="promptPassword()">切换到编辑模式</button>
                 <button id="changePasswordBtn" class="tab-btn" style="background: #17a2b8;" onclick="showChangePasswordModal()">修改密码</button>
                 <button id="clearDataBtn" class="tab-btn" style="background: #dc3545;" onclick="clearAllData()">清除所有数据</button>
+                <button id="githubSettingsBtn" class="tab-btn" style="background: #333; color: white;" onclick="showGithubSettings()">⚙️ GitHub设置</button>
             </div>
         </div>
 
@@ -584,7 +585,11 @@
                 <label for="importExcel" class="btn-submit" style="background: #17a2b8; cursor: pointer; padding: 10px 20px; display: inline-block;">📥 导入Excel</label>
                 <input type="file" id="importExcel" accept=".xlsx,.xls" style="display: none;" onchange="importExcelData(this)">
                 <button class="btn-submit" style="background: #6c757d;" onclick="downloadExcelTemplate()">📋 下载模板</button>
-                <button class="btn-submit" style="background: #28a745;" onclick="exportData()">📤 导出数据</button>
+                <button class="btn-submit" style="background: #28a745;" onclick="exportData()">📤 导出CSV</button>
+                <button class="btn-submit" style="background: #17a2b8;" onclick="exportCompleteData()">📤 导出完整数据</button>
+                <label for="importJson" class="btn-submit" style="background: #ffc107; cursor: pointer; padding: 10px 20px; display: inline-block;">📥 导入JSON</label>
+                <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJsonData(this)">
+                <button class="btn-submit" style="background: #6f42c1;" onclick="loadFromGitHub()">🌐 从GitHub加载</button>
             </div>
             <table id="cadreTable">
                 <thead>
@@ -793,6 +798,29 @@
         </div>
     </div>
 
+    <!-- GitHub设置弹窗 -->
+    <div id="githubSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeGithubSettingsModal()">&times;</span>
+            <h2>⚙️ GitHub设置</h2>
+            <div class="form-group">
+                <label for="githubUrl">GitHub仓库JSON文件URL</label>
+                <input type="text" id="githubUrl" placeholder="例如：https://raw.githubusercontent.com/username/repo/main/干部考核完整数据.json" style="width: 100%;">
+            </div>
+            <div class="form-group">
+                <label for="autoLoadGithub">
+                    <input type="checkbox" id="autoLoadGithub"> 启动时自动从GitHub加载数据
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="autoSyncGithub">
+                    <input type="checkbox" id="autoSyncGithub"> 定期自动同步GitHub数据 (每5分钟)
+                </label>
+            </div>
+            <button class="btn-submit" onclick="saveGithubSettings()">保存设置</button>
+        </div>
+    </div>
+
     <script>
         // 服务器配置
         const SERVER_URL = 'http://192.168.1.19:3000/api';
@@ -805,6 +833,13 @@
         let contributions = JSON.parse(localStorage.getItem('contributions')) || [];
         let trainings = JSON.parse(localStorage.getItem('trainings')) || [];
         let deductions = JSON.parse(localStorage.getItem('deductions')) || [];
+
+        // GitHub设置
+        let githubSettings = JSON.parse(localStorage.getItem('githubSettings')) || {
+            url: '',
+            autoLoad: false,
+            autoSync: false
+        };
 
         // 模式和权限控制
         let currentMode = 'view'; // 'view' 或 'edit'
@@ -1982,6 +2017,194 @@
             link.click();
         }
 
+        function exportCompleteData() {
+            const completeData = {
+                cadres,
+                competitions,
+                contributions,
+                trainings,
+                deductions,
+                metadata: {
+                    exportDate: new Date().toISOString(),
+                    version: '1.0',
+                    cadreCount: cadres.length,
+                    competitionCount: competitions.length,
+                    contributionCount: contributions.length,
+                    trainingCount: trainings.length,
+                    deductionCount: deductions.length
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(completeData, null, 2)], { type: 'application/json;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '干部考核完整数据.json';
+            link.click();
+        }
+
+        function importJsonData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.cadres) {
+                        cadres = data.cadres;
+                    }
+                    if (data.competitions) {
+                        competitions = data.competitions;
+                    }
+                    if (data.contributions) {
+                        contributions = data.contributions;
+                    }
+                    if (data.trainings) {
+                        trainings = data.trainings;
+                    }
+                    if (data.deductions) {
+                        deductions = data.deductions;
+                    }
+
+                    saveAllData();
+                    refreshAllTables();
+                    alert('数据导入成功！');
+                    
+                    // 重置文件输入
+                    input.value = '';
+                } catch (error) {
+                    alert('数据导入失败：' + error.message);
+                }
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
+        function loadFromGitHub() {
+            const githubUrl = prompt('请输入GitHub仓库中JSON文件的原始URL：\n例如：https://raw.githubusercontent.com/username/repo/main/干部考核完整数据.json');
+            
+            if (!githubUrl) return;
+
+            fetch(githubUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络请求失败');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.cadres) {
+                        cadres = data.cadres;
+                    }
+                    if (data.competitions) {
+                        competitions = data.competitions;
+                    }
+                    if (data.contributions) {
+                        contributions = data.contributions;
+                    }
+                    if (data.trainings) {
+                        trainings = data.trainings;
+                    }
+                    if (data.deductions) {
+                        deductions = data.deductions;
+                    }
+
+                    saveAllData();
+                    refreshAllTables();
+                    alert('从GitHub加载数据成功！');
+                })
+                .catch(error => {
+                    alert('从GitHub加载数据失败：' + error.message);
+                });
+        }
+
+        function showGithubSettings() {
+            const modal = document.getElementById('githubSettingsModal');
+            const githubUrlInput = document.getElementById('githubUrl');
+            const autoLoadCheckbox = document.getElementById('autoLoadGithub');
+            const autoSyncCheckbox = document.getElementById('autoSyncGithub');
+
+            // 填充当前设置
+            githubUrlInput.value = githubSettings.url;
+            autoLoadCheckbox.checked = githubSettings.autoLoad;
+            autoSyncCheckbox.checked = githubSettings.autoSync;
+
+            modal.style.display = 'block';
+        }
+
+        function closeGithubSettingsModal() {
+            document.getElementById('githubSettingsModal').style.display = 'none';
+        }
+
+        function saveGithubSettings() {
+            const githubUrlInput = document.getElementById('githubUrl');
+            const autoLoadCheckbox = document.getElementById('autoLoadGithub');
+            const autoSyncCheckbox = document.getElementById('autoSyncGithub');
+
+            githubSettings = {
+                url: githubUrlInput.value,
+                autoLoad: autoLoadCheckbox.checked,
+                autoSync: autoSyncCheckbox.checked
+            };
+
+            localStorage.setItem('githubSettings', JSON.stringify(githubSettings));
+            
+            // 如果启用了定期同步，重启同步计时器
+            if (githubSettings.autoSync) {
+                startGithubSync();
+            }
+
+            alert('GitHub设置保存成功！');
+            closeGithubSettingsModal();
+        }
+
+        async function autoLoadFromGithub() {
+            if (githubSettings.autoLoad && githubSettings.url) {
+                try {
+                    const response = await fetch(githubSettings.url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.cadres) {
+                            cadres = data.cadres;
+                        }
+                        if (data.competitions) {
+                            competitions = data.competitions;
+                        }
+                        if (data.contributions) {
+                            contributions = data.contributions;
+                        }
+                        if (data.trainings) {
+                            trainings = data.trainings;
+                        }
+                        if (data.deductions) {
+                            deductions = data.deductions;
+                        }
+
+                        saveAllData();
+                        refreshAllTables();
+                        console.log('从GitHub自动加载数据成功');
+                    }
+                } catch (error) {
+                    console.error('从GitHub自动加载数据失败：', error.message);
+                }
+            }
+        }
+
+        function startGithubSync() {
+            // 清除现有的同步计时器
+            if (window.githubSyncInterval) {
+                clearInterval(window.githubSyncInterval);
+            }
+
+            // 如果启用了自动同步，设置新的计时器
+            if (githubSettings.autoSync && githubSettings.url) {
+                window.githubSyncInterval = setInterval(async () => {
+                    await autoLoadFromGithub();
+                }, 5 * 60 * 1000); // 每5分钟同步一次
+            }
+        }
+
         function saveAllData() {
             localStorage.setItem('cadres', JSON.stringify(cadres));
             localStorage.setItem('competitions', JSON.stringify(competitions));
@@ -1998,11 +2221,14 @@
         window.onclick = function(event) {
             const detailModal = document.getElementById('detailModal');
             const passwordModal = document.getElementById('changePasswordModal');
+            const githubModal = document.getElementById('githubSettingsModal');
             
             if (event.target == detailModal) {
                 closeModal();
             } else if (event.target == passwordModal) {
                 closeChangePasswordModal();
+            } else if (event.target == githubModal) {
+                closeGithubSettingsModal();
             }
         };
 
@@ -2012,6 +2238,14 @@
             // 初始化模式控制
             updateModeControls();
             disableEditControls();
+            
+            // 自动从GitHub加载数据
+            autoLoadFromGithub();
+            
+            // 启动GitHub同步
+            if (githubSettings.autoSync) {
+                startGithubSync();
+            }
             
             // 检查服务器状态并同步数据
             (async function() {
