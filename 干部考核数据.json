@@ -1,0 +1,54 @@
+{
+  "cadres": [
+    {
+      "id": "1767946089160",
+      "name": "许家铭",
+      "department": "AI部",
+      "position": "会员",
+      "major": "电气工程",
+      "class": "电气班",
+      "grade": "2025级",
+      "equipmentScore": 0
+    },
+    {
+      "id": "1767947917222",
+      "name": "吴君杰",
+      "department": "AI部",
+      "position": "会员",
+      "major": "电子信息",
+      "class": "海峡电信班",
+      "grade": "2025级",
+      "equipmentScore": 0
+    }
+  ],
+  "competitions": [
+    {
+      "id": 1767946119768,
+      "cadreId": "1767946089160",
+      "name": "全国帅哥大赛",
+      "level": "国家级",
+      "award": "一等奖",
+      "score": 300
+    }
+  ],
+  "contributions": [
+    {
+      "id": 1767946130676,
+      "cadreId": "1767946089160",
+      "type": "卫生",
+      "count": 1000,
+      "totalScore": 100
+    }
+  ],
+  "trainings": [
+    {
+      "id": 1767946147793,
+      "cadreId": "1767946089160",
+      "traineeName": "许阿班",
+      "hours": 250,
+      "score": 125
+    }
+  ],
+  "deductions": [],
+  "adminPassword": "123456"
+}
