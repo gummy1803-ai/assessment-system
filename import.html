@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 智能导入 - 干部考核管理系统</title>
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+            background-image: url('背景图.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin: 20px 0 8px;
+            font-size: 2.2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 25px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .back-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover { background: white; color: #667eea; }
+
+        .status-group { display: flex; gap: 10px; align-items: center; }
+
+        .pill {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .pill .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffc107; }
+        .pill.ok .dot { background: #28a745; }
+        .pill.err .dot { background: #dc3545; }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            font-size: 1.3em;
+        }
+
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 45px 20px;
+            text-align: center;
+            color: #667eea;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            background: #f6f7ff;
+            transition: all 0.2s ease;
+        }
+        .drop-zone.dragover, .drop-zone:hover { background: #ecefff; }
+        .drop-zone .hint { font-size: 13px; font-weight: normal; color: #888; margin-top: 8px; }
+
+        .thumb-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .thumb-item {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+            background: #f5f5f5;
+        }
+        .thumb-item img { width: 100%; height: 110px; object-fit: cover; display: block; }
+        .thumb-item .remove {
+            position: absolute; top: 4px; right: 4px;
+            width: 24px; height: 24px; border-radius: 50%;
+            border: none; background: rgba(220,53,69,0.9); color: white;
+            cursor: pointer; font-size: 13px; line-height: 1;
+        }
+        .thumb-item .fname {
+            font-size: 11px; color: #555; padding: 4px 6px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .thumb-item .ai-tag {
+            position: absolute; left: 4px; top: 4px;
+            background: rgba(102,126,234,0.92); color: #fff;
+            font-size: 11px; padding: 2px 7px; border-radius: 999px;
+        }
+
+        .field-label { display: block; font-weight: bold; color: #444; margin: 18px 0 8px; }
+
+        textarea, input[type="text"], input[type="number"], input[type="password"], select {
+            padding: 9px 11px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            width: 100%;
+        }
+        textarea:focus, input:focus, select:focus { outline: none; border-color: #667eea; }
+
+        .btn {
+            padding: 11px 22px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn.save { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); margin-top: 18px; }
+        .btn.danger-sm { background: #dc3545; padding: 5px 12px; font-size: 13px; }
+
+        .progress-text { margin-left: 14px; color: #667eea; font-weight: bold; }
+
+        .table-wrap { overflow-x: auto; margin-top: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border: 1px solid #e3e3e3; text-align: center; vertical-align: middle; }
+        th { background: #f0f2ff; color: #444; font-size: 14px; white-space: nowrap; }
+        td img.review-thumb { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+        td select, td input { min-width: 90px; }
+        td .ai-sum { font-size: 12px; color: #777; max-width: 170px; margin: 0 auto; }
+        td .row-status { font-size: 12px; font-weight: bold; white-space: nowrap; }
+        td .row-status.ok { color: #28a745; }
+        td .row-status.err { color: #dc3545; }
+        td .row-status.doing { color: #fd7e14; }
+        .type-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #ecefff; color: #667eea; font-size: 12px; font-weight: bold; }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+        }
+        .gallery-item {
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fafafa;
+        }
+        .gallery-item img { width: 100%; height: 150px; object-fit: cover; display: block; cursor: pointer; }
+        .gallery-item .g-info { padding: 9px 11px; font-size: 13px; color: #444; }
+        .gallery-item .g-info .g-title { font-weight: bold; margin-bottom: 3px; }
+        .gallery-item .g-info .g-meta { color: #999; font-size: 12px; }
+        .muted { color: #999; text-align: center; padding: 25px 0; }
+
+        .setup-banner {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-bottom: 20px;
+            color: #664d03;
+        }
+        .setup-banner h2 { margin-bottom: 10px; border: none; padding: 0; color: #664d03; }
+        .setup-banner code { background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; }
+
+        #toast {
+            position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; border-radius: 8px; color: white; font-weight: bold;
+            display: none; z-index: 999; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            max-width: 80vw;
+        }
+
+        @media (max-width: 768px) {
+            .card { padding: 16px; }
+            h1 { font-size: 1.6em; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="top-bar">
+        <a class="back-btn" href="index.html">← 返回考核系统</a>
+        <div class="status-group">
+            <span id="rtIndicator" class="pill"><span class="dot"></span><span id="rtText">连接中…</span></span>
+            <span id="pwdIndicator" class="pill"><span class="dot"></span><span id="pwdText">密码未验证</span></span>
+        </div>
+    </div>
+
+    <h1>🤖 智能导入工作台</h1>
+    <p class="subtitle">上传证书 / 记录照片 + 补充说明 → AI 自动识别 → 人工核对 → 一键归档进数据库</p>
+
+    <!-- 未配置提示 -->
+    <div id="setupBanner" class="setup-banner" style="display:none;"></div>
+
+    <!-- 步骤1：上传图片 -->
+    <div class="card">
+        <h2>① 上传图片</h2>
+        <div id="dropZone" class="drop-zone">
+            📷 点击此处选择图片，或把图片拖拽进来（支持一次多张）
+            <div class="hint">支持 jpg / png / webp，单张建议不超过 10MB</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none;">
+        <div id="thumbGrid" class="thumb-grid"></div>
+        <label class="field-label" for="batchDesc">补充说明（可选，会连同图片一起交给 AI，可显著提高识别准确度）</label>
+        <textarea id="batchDesc" rows="2" placeholder="例如：这些是宣传部 10 月的获奖证书和值班记录，照片里的人都是技术部的"></textarea>
+    </div>
+
+    <!-- 步骤2：AI 识别与核对 -->
+    <div class="card">
+        <h2>② AI 识别与人工核对</h2>
+        <button id="analyzeBtn" class="btn primary" disabled>🚀 开始识别（已选 0 张）</button>
+        <span id="analyzeProgress" class="progress-text"></span>
+
+        <div id="reviewWrap" style="display:none;">
+            <div class="table-wrap">
+                <table id="reviewTable">
+                    <thead>
+                        <tr>
+                            <th>图片</th><th>记录类型</th><th>干部</th><th>部门</th>
+                            <th>内容</th><th>分数</th><th>AI 识别说明</th><th>状态</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviewBody"></tbody>
+                </table>
+            </div>
+            <button id="saveBtn" class="btn save">💾 全部保存并归档</button>
+            <span id="saveProgress" class="progress-text"></span>
+        </div>
+    </div>
+
+    <!-- 图片存档库 -->
+    <div class="card">
+        <h2>🖼️ 图片存档库</h2>
+        <div id="gallery" class="gallery"><p class="muted">暂无存档图片，保存后会自动出现在这里</p></div>
+    </div>
+</div>
+
+<!-- 管理员密码验证弹窗 -->
+<div id="pwdModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:998; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:15px; padding:30px; width:min(92vw,380px); box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+        <h2 style="color:#333; margin-bottom:6px; font-size:1.2em; border:none; padding:0;">🔐 管理员验证</h2>
+        <p style="color:#888; font-size:13px; margin-bottom:15px;">请输入管理密码（与主系统一致），验证通过后才能保存数据。</p>
+        <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')submitPwd()">
+        <div id="pwdError" style="color:#dc3545; font-size:13px; margin-top:8px; min-height:18px;"></div>
+        <button class="btn primary" style="width:100%; margin-top:6px;" onclick="submitPwd()">验证并进入</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================================
+ * 智能导入工作台
+ * 流程：上传图片 → 压缩后送 AI 视觉模型识别 → 结构化结果人工核对 →
+ *       图片存 Supabase Storage → 考核记录走密码校验 RPC → 图片存档表留档
+ * ========================================================================== */
+
+// ------------------------- 全局状态 -------------------------
+let sb = null;                       // Supabase 客户端
+let adminPwd = sessionStorage.getItem('import_adminPwd') || '';
+let pwdVerified = false;
+let state = { cadres: [], rules: null };
+let items = [];                      // 待处理图片：{id, file, url, desc, type, fields..., aiSummary, status, msg}
+
+const TYPES = [
+    { v: 'competition', label: '🏆 比赛成绩', table: 'competitions', rpc: 'add_competition' },
+    { v: 'contribution', label: '🤝 协会贡献', table: 'contributions', rpc: 'add_contribution' },
+    { v: 'training',    label: '👨‍🏫 新生指导', table: 'trainings',    rpc: 'add_training' },
+    { v: 'deduction',   label: '⚠️ 职责扣分', table: 'deductions',   rpc: 'add_deduction' },
+    { v: 'equipment',   label: '🔧 设备分',   table: 'cadres',       rpc: 'upsert_cadre' },
+    { v: 'cadre',       label: '👤 新建干部', table: 'cadres',       rpc: 'upsert_cadre' },
+    { v: 'image_only',  label: '🖼️ 仅存图片', table: '',             rpc: '' }
+];
+const TYPE_LABEL = Object.fromEntries(TYPES.map(t => [t.v, t.label]));
+
+// ------------------------- 工具函数 -------------------------
+function $(id) { return document.getElementById(id); }
+
+function toast(msg, type = 'info', ms = 3200) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.style.background = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#333';
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = 'none'; }, ms);
+}
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function uid() { return crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2); }
+
+function setConn(status, text) {
+    const p = $('rtIndicator');
+    p.className = 'pill ' + (status === 'ok' ? 'ok' : status === 'err' ? 'err' : '');
+    $('rtText').textContent = text;
+}
+
+function setPwd(ok, text) {
+    const p = $('pwdIndicator');
+    p.className = 'pill ' + (ok ? 'ok' : 'err');
+    $('pwdText').textContent = text;
+}
+
+// ------------------------- 初始化 -------------------------
+async function init() {
+    const cfg = window.SUPABASE_CONFIG;
+    if (!cfg || !cfg.url || !cfg.anonKey) {
+        showSetupBanner('缺少 Supabase 配置：请检查 config.js 中的 SUPABASE_CONFIG。');
+        setConn('err', '未配置');
+        return;
+    }
+    const aiCfg = window.AI_CONFIG;
+    if (!aiCfg || !aiCfg.apiKey || aiCfg.apiKey.includes('填入')) {
+        showSetupBanner('尚未配置 AI 识别：<code>config.js</code> 中的 <code>AI_CONFIG.apiKey</code> 还是占位符。' +
+            '请到 <a href="https://open.bigmodel.cn" target="_blank">智谱开放平台</a> 注册并创建 API Key（免费模型 glm-4v-flash 即可），填入后刷新本页。');
+    }
+
+    try {
+        sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+        // 连通性检测：读 settings 计分规则 + 人员名单
+        const [cadresRes, rulesRes] = await Promise.all([
+            sb.from('cadres').select('*').order('created_at', { ascending: true }),
+            sb.from('settings').select('value').eq('key', 'scoringRules').maybeSingle()
+        ]);
+        if (cadresRes.error) throw cadresRes.error;
+        state.cadres = cadresRes.data || [];
+        state.rules = rulesRes.data ? safeJson(rulesRes.data.value) : null;
+        setConn('ok', '已连接');
+    } catch (e) {
+        setConn('err', '连接失败');
+        toast('数据库连接失败：' + e.message, 'error', 6000);
+        return;
+    }
+
+    await ensurePassword();
+    loadGallery();
+}
+
+function safeJson(s) { try { return JSON.parse(s); } catch { return null; } }
+
+function showSetupBanner(html) {
+    const b = $('setupBanner');
+    b.innerHTML = '<h2>⚙️ 配置提示</h2><div>' + html + '</div>';
+    b.style.display = 'block';
+}
+
+async function ensurePassword() {
+    // 已有缓存密码则直接验证，否则弹窗输入（与主系统同一套管理密码）
+    if (adminPwd) {
+        const ok = await tryVerify(adminPwd);
+        if (ok) { setPwd(true, '编辑权限 ✓'); return; }
+        adminPwd = '';
+        sessionStorage.removeItem('import_adminPwd');
+        toast('缓存的密码已失效，请重新输入', 'error');
+    }
+    showPwdModal();
+}
+
+function showPwdModal() {
+    $('pwdModal').style.display = 'flex';
+    $('pwdInput').value = '';
+    $('pwdError').textContent = '';
+    setTimeout(() => $('pwdInput').focus(), 50);
+}
+
+async function submitPwd() {
+    const input = $('pwdInput').value.trim();
+    if (!input) return;
+    $('pwdError').textContent = '';
+    const ok = await tryVerify(input);
+    if (ok) {
+        adminPwd = input;
+        sessionStorage.setItem('import_adminPwd', adminPwd);
+        $('pwdModal').style.display = 'none';
+        setPwd(true, '编辑权限 ✓');
+        toast('密码验证通过', 'success');
+    } else {
+        $('pwdError').textContent = '密码错误，请重试';
+        $('pwdInput').value = '';
+        $('pwdInput').focus();
+    }
+}
+
+async function tryVerify(pwd) {
+    try {
+        const { data, error } = await sb.rpc('verify_admin_password', { p_password: pwd });
+        if (error) throw error;
+        pwdVerified = data === true;
+        return pwdVerified;
+    } catch (e) {
+        toast('验证失败：' + e.message, 'error');
+        return false;
+    }
+}
+
+// ------------------------- 图片选择与预览 -------------------------
+$('dropZone').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+const dz = $('dropZone');
+['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
+dz.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+function addFiles(fileList) {
+    const files = [...fileList].filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    for (const f of files) {
+        items.push({
+            id: uid(), file: f, url: URL.createObjectURL(f), desc: '',
+            type: 'unknown', name: '', department: '', position: '', major: '', skipImage: false,
+            cName: '', level: '', award: '', cType: '', count: 1,
+            trainee: '', hours: 1, reason: '', score: 0, equip: 0,
+            aiSummary: '', status: '待识别', msg: ''
+        });
+    }
+    renderThumbs();
+    toast(`已添加 ${files.length} 张图片`, 'success');
+}
+
+function removeItem(id) {
+    const it = items.find(x => x.id === id);
+    if (it) URL.revokeObjectURL(it.url);
+    items = items.filter(x => x.id !== id);
+    renderThumbs();
+    renderReview();
+}
+
+function renderThumbs() {
+    const g = $('thumbGrid');
+    g.innerHTML = items.map(it => `
+        <div class="thumb-item">
+            ${it.aiSummary ? `<span class="ai-tag">已识别</span>` : ''}
+            <img src="${it.url}" alt="">
+            <button class="remove" onclick="removeItem('${it.id}')" title="移除">✕</button>
+            <div class="fname" title="${esc(it.file.name)}">${esc(it.file.name)}</div>
+        </div>`).join('');
+    const btn = $('analyzeBtn');
+    btn.disabled = !items.length;
+    btn.textContent = `🚀 开始识别（已选 ${items.length} 张）`;
+}
+
+// ------------------------- AI 识别 -------------------------
+$('analyzeBtn').addEventListener('click', runAnalysis);
+
+const AI_PROMPT_TEMPLATE = `你是干部考核系统的单据识别助手。请识别图片中的关键信息，严格只输出 JSON（不要 markdown 代码块、不要多余文字），分两种情况：
+
+【情况一：单人单据（获奖证书、值班表、培训记录、扣分通知等）】输出一个 JSON 对象：
+{"cadre_name":"干部姓名，识别不出填空字符串","department":"部门","major":"专业，识别不出填空字符串","position":"职务","record_type":"competition|contribution|training|deduction|equipment|unknown","name":"比赛名称","level":"国家级|省级|校级","award":"一等奖|二等奖|三等奖","contribution_type":"贡献类型，如值班、维修、活动组织","count":1,"trainee_name":"被指导新生姓名","hours":1,"reason":"扣分原因","score":0,"equipment_score":0,"summary":"一句话概括图片内容"}
+
+【情况二：成员名单、名册表格、多人列表截图】输出 JSON 数组，每个人一项：
+[{"cadre_name":"姓名","department":"部门，机构名称如办公室/财资部/宣传部/电控部","major":"专业，如电气工程及其自动化，识别不出填空字符串","position":"职务，头衔词如会长/副会长/部长/副部长/干事","record_type":"cadre","summary":"简短"}]
+
+识别规则：
+- 三个人员字段必须严格区分：department=所属机构/部门（办公室、财资部、宣传部等机构名）；position=头衔职务（会长、副会长、部长、干事等头衔词）；major=所学专业（如电气工程及其自动化）。名单里某一列若全是会长/部长这类头衔词，一律归入 position，绝不能填进 department；专业列缺失时 major 留空
+- 获奖证书、比赛奖状照片 → competition，提取比赛名称、级别、奖项
+- 值班表、服务记录、维修单、活动照片 → contribution，提取类型与次数
+- 培训签到、带新生照片 → training，提取新生姓名与指导小时数
+- 扣分通知、违纪记录 → deduction，提取原因与分数
+- 设备照片、器材清单 → equipment，并给出 0-1000 的 equipment_score 建议
+- 成员名单、群成员截图、多人名册 → 输出数组，每人 record_type=cadre，电话号码忽略
+- 无法判断 → 单个对象，record_type=unknown
+- 看不出来的字段填空字符串或 0；所有数字必须是数字类型，不能是字符串`;
+
+async function runAnalysis() {
+    if (!items.length) return;
+    const aiCfg = window.AI_CONFIG;
+    if (!aiCfg || !aiCfg.apiKey || aiCfg.apiKey.includes('填入')) {
+        toast('请先在 config.js 中填入 AI_CONFIG.apiKey', 'error', 5000);
+        return;
+    }
+
+    const userDesc = $('batchDesc').value.trim();
+    const btn = $('analyzeBtn');
+    btn.disabled = true;
+    let done = 0, fail = 0;
+
+    for (const it of items.slice()) {
+        it.status = '识别中';
+        $('analyzeProgress').textContent = `识别中 ${done + fail + 1} / ${items.length}…`;
+        try {
+            const dataUrl = await compressForAI(it.file);
+            const list = await callAI(dataUrl, userDesc, aiCfg);
+            if (list.length > 1) {
+                // 多人名单：原图归档为仅存图片，成员逐人拆行
+                it.type = 'image_only';
+                it.name = ''; it.department = '';
+                it.aiSummary = `识别到 ${list.length} 位成员，已拆分为独立行`;
+                it.status = '已识别';
+                list.forEach((p, idx) => {
+                    items.push({
+                        id: uid(), file: it.file, url: it.url, desc: '',
+                        type: 'cadre', name: str(p.cadre_name), department: str(p.department),
+                        major: str(p.major), position: str(p.position),
+                        cName: '', level: '', award: '', cType: '', count: 1,
+                        trainee: '', hours: 1, reason: '', score: 0, equip: 0,
+                        aiSummary: `名单成员 ${idx + 1}/${list.length}`, status: '已识别', msg: '', skipImage: true
+                    });
+                });
+            } else {
+                applyAIResult(it, list[0]);
+                it.status = '已识别';
+            }
+        } catch (e) {
+            it.status = '识别失败';
+            it.msg = e.message;
+            fail++;
+            // CORS / 网络错误时提示更友好，且中断后续请求
+            if (e.message.includes('Failed to fetch')) {
+                it.msg = '无法连接 AI 接口（网络/CORS），请检查网络或更换 AI_CONFIG.url';
+                toast(it.msg, 'error', 6000);
+                break;
+            }
+        }
+        done++;
+        renderThumbs();
+    }
+
+    $('analyzeProgress').textContent = fail ? `完成，${fail} 张识别失败（可重试）` : `全部识别完成，共 ${items.length} 张`;
+    btn.disabled = false;
+    renderThumbs();
+    renderReview();
+    if (fail === 0) toast('识别完成，请核对下方结果后保存', 'success');
+}
+
+// 压缩图片到最长边 1280px，减小 AI 请求体积
+function compressForAI(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            const maxSide = 1280;
+            let { width, height } = img;
+            const scale = Math.min(1, maxSide / Math.max(width, height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(width * scale);
+            canvas.height = Math.round(height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+        img.src = url;
+    });
+}
+
+async function callAI(dataUrl, userDesc, aiCfg) {
+    const prompt = userDesc
+        ? AI_PROMPT_TEMPLATE + '\n\n补充说明（用户备注，与图片内容冲突时以备注为准）：' + userDesc
+        : AI_PROMPT_TEMPLATE;
+
+    const res = await fetch(aiCfg.url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + aiCfg.apiKey
+        },
+        body: JSON.stringify({
+            model: aiCfg.model,
+            temperature: 0.1,
+            max_tokens: 1024,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image_url', image_url: { url: dataUrl } },
+                    { type: 'text', text: prompt }
+                ]
+            }]
+        })
+    });
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`AI 接口返回 ${res.status}：${body.slice(0, 120)}`);
+    }
+    const j = await res.json();
+    const text = j.choices && j.choices[0] && j.choices[0].message ? j.choices[0].message.content : '';
+    return parseAIJson(text);
+}
+
+function parseAIJson(text) {
+    text = String(text || '').trim()
+        .replace(/^```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+    const opens = [text.indexOf('{'), text.indexOf('[')].filter(i => i >= 0);
+    const s = Math.min(...opens);
+    const e = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+    if (!opens.length || !isFinite(s) || e < 0 || e <= s) throw new Error('AI 未返回 JSON');
+    const raw = text.slice(s, e + 1);
+
+    // 1. 直接解析（对象或数组）
+    try { return normalizeAI(JSON.parse(raw)); } catch (_) {}
+
+    // 2. 容错：AI 可能把多个对象写成 { {...}, {...} } 的畸形格式，逐个提取完整对象
+    const objs = [];
+    let start = -1, depth = 0, inStr = false, esc = false;
+    for (let i = 0; i < raw.length; i++) {
+        const c = raw[i];
+        if (inStr) {
+            if (esc) esc = false;
+            else if (c === '\\') esc = true;
+            else if (c === '"') inStr = false;
+            continue;
+        }
+        if (c === '"') inStr = true;
+        else if (c === '{') { if (depth === 0) start = i; depth++; }
+        else if (c === '}') { depth--; if (depth === 0 && start >= 0) { objs.push(raw.slice(start, i + 1)); start = -1; } }
+    }
+    const arr = [];
+    for (const o of objs) {
+        try { arr.push(...normalizeAI(JSON.parse(o))); } catch (_) {}
+    }
+    if (arr.length) return arr;
+    throw new Error('AI 返回的 JSON 无法解析，可重试一次');
+}
+
+// 归一化为数组：单个对象 → [对象]，过滤无效项
+function normalizeAI(parsed) {
+    let arr = Array.isArray(parsed) ? parsed : [parsed];
+    arr = arr.filter(o => o && typeof o === 'object' && !Array.isArray(o));
+    if (!arr.length) throw new Error('AI 返回内容异常');
+    return arr;
+}
+
+function applyAIResult(it, ai) {
+    it.name = str(ai.cadre_name);
+    it.department = str(ai.department);
+    it.major = str(ai.major);
+    it.position = str(ai.position);
+    const type = TYPES.some(t => t.v === ai.record_type) ? ai.record_type : 'unknown';
+    it.type = type === 'unknown' ? 'image_only' : type;
+    it.cName = str(ai.name);
+    it.level = ['国家级', '省级', '校级'].includes(ai.level) ? ai.level : '';
+    it.award = ['一等奖', '二等奖', '三等奖'].includes(ai.award) ? ai.award : '';
+    it.cType = str(ai.contribution_type);
+    it.count = num(ai.count, 1);
+    it.trainee = str(ai.trainee_name);
+    it.hours = num(ai.hours, 1);
+    it.reason = str(ai.reason);
+    it.equip = Math.min(1000, Math.max(0, num(ai.equipment_score, 0)));
+    it.score = num(ai.score, 0);
+    if (it.type === 'competition') it.score = suggestScore(it);
+    if (it.type === 'contribution') it.score = round1(it.count * contribRate(it.cType));
+    if (it.type === 'training') it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
+    it.aiSummary = str(ai.summary) || '（AI 未给出说明）';
+}
+
+function str(v) { return (v === null || v === undefined) ? '' : String(v).trim(); }
+function num(v, dft) { const n = parseFloat(v); return isNaN(n) ? dft : n; }
+
+function contribRate(type) {
+    const rates = state.rules?.contributionTypeRates;
+    if (type && rates && rates[type] !== undefined) return num(rates[type], 0.1);
+    return num(state.rules?.contributionPerCount, 0.1);
+}
+function round1(n) { return Math.round(n * 10) / 10; }
+
+// 按计分规则自动算比赛分
+function suggestScore(it) {
+    const comp = state.rules && state.rules.competitions;
+    if (comp && comp[it.level] && comp[it.level][it.award] !== undefined) return comp[it.level][it.award];
+    return it.score || 0;
+}
+
+// ------------------------- 核对表渲染 -------------------------
+function renderReview() {
+    const recognized = items.filter(it => it.status !== '待识别' && it.status !== '识别中');
+    const wrap = $('reviewWrap');
+    if (!recognized.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+
+    $('reviewBody').innerHTML = recognized.map(it => {
+        const typeOpts = TYPES.map(t => `<option value="${t.v}" ${t.v === it.type ? 'selected' : ''}>${t.label}</option>`).join('');
+        return `
+        <tr data-id="${it.id}">
+            <td><img class="review-thumb" src="${it.url}"></td>
+            <td><select onchange="onTypeChange('${it.id}', this.value)">${typeOpts}</select></td>
+            <td><input type="text" list="cadreList" value="${esc(it.name)}" oninput="items.find(x=>x.id==='${it.id}').name=this.value; onNameInput('${it.id}')"></td>
+            <td><input type="text" value="${esc(it.department)}" oninput="items.find(x=>x.id==='${it.id}').department=this.value"></td>
+            <td>${contentCell(it)}</td>
+            <td>${scoreCell(it)}</td>
+            <td><div class="ai-sum" title="${esc(it.msg || it.aiSummary)}">${esc(it.aiSummary)}${it.msg ? `<br><span style="color:#dc3545">${esc(it.msg)}</span>` : ''}</div></td>
+            <td><span class="row-status ${statusClass(it.status)}">${esc(it.status)}${it.msg && it.status.includes('失败') ? '' : ''}</span></td>
+            <td><button class="btn danger-sm" onclick="removeItem('${it.id}')">删除</button></td>
+        </tr>`;
+    }).join('');
+
+    ensureDatalist();
+}
+
+function statusClass(s) {
+    if (s === '已保存') return 'ok';
+    if (s.includes('失败') || s === '识别失败') return 'err';
+    if (s === '保存中') return 'doing';
+    return '';
+}
+
+function contentCell(it) {
+    switch (it.type) {
+        case 'competition': return `
+            <input type="text" placeholder="比赛名称" value="${esc(it.cName)}" style="min-width:130px;margin-bottom:4px;"
+                   oninput="items.find(x=>x.id==='${it.id}').cName=this.value">
+            <select onchange="onCompChange('${it.id}')">
+                <option value="">级别</option>
+                ${['国家级','省级','校级'].map(v => `<option ${v===it.level?'selected':''}>${v}</option>`).join('')}
+            </select>
+            <select onchange="onCompChange('${it.id}')" style="margin-top:4px;">
+                <option value="">奖项</option>
+                ${['一等奖','二等奖','三等奖'].map(v => `<option ${v===it.award?'selected':''}>${v}</option>`).join('')}
+            </select>`;
+        case 'contribution': return `
+            <input type="text" placeholder="贡献类型" value="${esc(it.cType)}" style="min-width:110px;margin-bottom:4px;"
+                   oninput="items.find(x=>x.id==='${it.id}').cType=this.value">
+            <input type="number" min="1" max="100" value="${it.count}" style="width:70px;" title="次数"
+                   oninput="onCountChange('${it.id}', this.value)"> 次`;
+        case 'training': return `
+            <input type="text" placeholder="新生姓名" value="${esc(it.trainee)}" style="min-width:110px;margin-bottom:4px;"
+                   oninput="items.find(x=>x.id==='${it.id}').trainee=this.value">
+            <input type="number" min="0.5" max="100" step="0.5" value="${it.hours}" style="width:70px;" title="小时"
+                   oninput="onHoursChange('${it.id}', this.value)"> 小时`;
+        case 'deduction': return `
+            <input type="text" placeholder="扣分原因" value="${esc(it.reason)}" style="min-width:140px;"
+                   oninput="items.find(x=>x.id==='${it.id}').reason=this.value">`;
+        case 'cadre': return `
+            <input type="text" placeholder="职务" value="${esc(it.position || '')}" style="min-width:100px;"
+                   oninput="items.find(x=>x.id==='${it.id}').position=this.value">
+            <input type="text" placeholder="专业" value="${esc(it.major || '')}" style="min-width:110px;"
+                   oninput="items.find(x=>x.id==='${it.id}').major=this.value">`;
+        default: return '<span style="color:#999">—</span>';
+    }
+}
+
+function scoreCell(it) {
+    if (it.type === 'image_only' || it.type === 'cadre') return '<span style="color:#999">—</span>';
+    if (it.type === 'equipment') return `
+        <input type="number" class="score-input" min="0" max="1000" value="${it.equip}" style="width:85px;"
+               oninput="items.find(x=>x.id==='${it.id}').equip=Math.min(1000,Math.max(0,parseFloat(this.value)||0))" title="设备分 0-1000">`;
+    return `
+        <input type="number" class="score-input" min="0" max="1000" step="0.1" value="${it.score}" style="width:85px;"
+               oninput="items.find(x=>x.id==='${it.id}').score=Math.min(1000,Math.max(0,parseFloat(this.value)||0))">`;
+}
+
+function ensureDatalist() {
+    if ($('cadreList')) return;
+    const dl = document.createElement('datalist');
+    dl.id = 'cadreList';
+    document.body.appendChild(dl);
+}
+function refreshDatalist() {
+    let dl = $('cadreList');
+    if (!dl) { ensureDatalist(); dl = $('cadreList'); }
+    dl.innerHTML = state.cadres.map(c => `<option value="${esc(c.name)}">${esc(c.department || '')}</option>`).join('');
+}
+
+// 选中已有干部时自动带出部门（只更新部门输入框，避免整表重渲染丢焦点）
+function onNameInput(id) {
+    const it = items.find(x => x.id === id);
+    const c = state.cadres.find(x => x.name === it.name.trim());
+    if (c && !it.department) {
+        it.department = c.department || '';
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) row.querySelector('td:nth-child(4) input').value = it.department;
+    }
+}
+
+function onTypeChange(id, type) {
+    const it = items.find(x => x.id === id);
+    it.type = type;
+    if (type === 'competition') it.score = suggestScore(it);
+    if (type === 'contribution') it.score = round1(it.count * contribRate(it.cType));
+    if (type === 'training') it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
+    renderReview();
+}
+
+function onCompChange(id) {
+    const it = items.find(x => x.id === id);
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    const selects = row.querySelectorAll('td select');
+    it.level = selects[1] ? selects[1].value : it.level;   // 第0个是类型下拉
+    it.award = selects[2] ? selects[2].value : it.award;
+    it.score = suggestScore(it);
+    updateScoreInput(id, it);
+}
+
+function onCountChange(id, v) {
+    const it = items.find(x => x.id === id);
+    it.count = Math.min(100, Math.max(1, parseInt(v) || 1));
+    it.score = round1(it.count * contribRate(it.cType));
+    updateScoreInput(id, it);
+}
+
+function onHoursChange(id, v) {
+    const it = items.find(x => x.id === id);
+    it.hours = Math.min(100, Math.max(0.5, parseFloat(v) || 1));
+    it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
+    updateScoreInput(id, it);
+}
+
+// 局部更新分数输入框（不重渲染整表，避免输入焦点丢失）
+function updateScoreInput(id, it) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (!row) return;
+    const scoreInput = row.querySelector('.score-input');
+    if (scoreInput) scoreInput.value = it.score;
+}
+
+// ------------------------- 保存归档 -------------------------
+$('saveBtn').addEventListener('click', saveAll);
+
+async function saveAll() {
+    if (!pwdVerified) { toast('请先通过密码验证', 'error'); return; }
+    const targets = items.filter(it => it.status === '已识别' || it.status.startsWith('保存失败'));
+    if (!targets.length) { toast('没有待保存的记录', 'error'); return; }
+
+    $('saveBtn').disabled = true;
+    let ok = 0, fail = 0;
+    for (let i = 0; i < targets.length; i++) {
+        const it = targets[i];
+        it.status = '保存中'; it.msg = '';
+        renderReview();
+        try {
+            await saveOne(it);
+            it.status = '已保存'; it.msg = '';
+            ok++;
+        } catch (e) {
+            it.status = '保存失败'; it.msg = e.message;
+            fail++;
+        }
+        $('saveProgress').textContent = `保存中 ${i + 1} / ${targets.length}…`;
+        renderReview();
+    }
+    $('saveProgress').textContent = fail ? `完成：${ok} 成功，${fail} 失败（可修改后重试）` : `全部保存成功（${ok} 条）`;
+    $('saveBtn').disabled = false;
+    refreshDatalist();
+    loadGallery();
+    toast(fail ? `${fail} 条保存失败，请查看失败原因` : `成功保存 ${ok} 条记录并归档图片`, fail ? 'error' : 'success', 5000);
+}
+
+async function saveOne(it) {
+    // 1. 干部：不存在则自动创建
+    let cadre = state.cadres.find(x => x.name === it.name.trim());
+    if (!cadre && it.type !== 'image_only') {
+        if (!it.name.trim()) throw new Error('干部姓名为空，无法保存');
+        const { data: saved, error } = await sb.rpc('upsert_cadre', {
+            p_password: adminPwd,
+            p_cadre: { name: it.name.trim(), department: it.department || '', equipment_score: 0 }
+        });
+        if (error) throw new Error('创建干部失败：' + error.message);
+        state.cadres.push(saved);
+        cadre = saved;
+    }
+
+    // 2. 图片上传 Storage（名单拆分行跳过，共用原图归档）
+    let path = '', publicUrl = '';
+    if (!it.skipImage) {
+        const ext = (it.file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        path = `uploads/${Date.now()}_${it.id.slice(0, 8)}.${ext}`;
+        const up = await sb.storage.from('import-images').upload(path, it.file, { contentType: it.file.type });
+        if (up.error) throw new Error('图片上传失败：' + up.error.message);
+        publicUrl = sb.storage.from('import-images').getPublicUrl(path).data.publicUrl;
+    }
+
+    // 3. 业务记录写入（按类型调对应 RPC）
+    let recordTable = '', recordId = '';
+    const t = TYPES.find(x => x.v === it.type);
+    if (t && t.rpc) {
+        if (it.type === 'equipment') {
+            const { data, error } = await sb.rpc('upsert_cadre', {
+                p_password: adminPwd,
+                p_cadre: { ...cadre, equipment_score: it.equip }
+            });
+            if (error) throw new Error('设备分保存失败：' + error.message);
+            Object.assign(cadre, data);
+            recordTable = 'cadres'; recordId = cadre.id;
+        } else if (it.type === 'competition') {
+            if (!it.cName.trim()) throw new Error('比赛名称为空');
+            const { data, error } = await sb.rpc('add_competition', {
+                p_password: adminPwd,
+                p_data: { cadre_id: cadre.id, name: it.cName.trim(), level: it.level, award: it.award, score: it.score }
+            });
+            if (error) throw new Error(error.message);
+            recordTable = 'competitions'; recordId = data.id;
+        } else if (it.type === 'contribution') {
+            if (!it.cType.trim()) throw new Error('贡献类型为空');
+            const { data, error } = await sb.rpc('add_contribution', {
+                p_password: adminPwd,
+                p_data: { cadre_id: cadre.id, type: it.cType.trim(), count: it.count, total_score: it.score }
+            });
+            if (error) throw new Error(error.message);
+            recordTable = 'contributions'; recordId = data.id;
+        } else if (it.type === 'training') {
+            if (!it.trainee.trim()) throw new Error('新生姓名为空');
+            const { data, error } = await sb.rpc('add_training', {
+                p_password: adminPwd,
+                p_data: { cadre_id: cadre.id, trainee_name: it.trainee.trim(), hours: it.hours, score: it.score }
+            });
+            if (error) throw new Error(error.message);
+            recordTable = 'trainings'; recordId = data.id;
+        } else if (it.type === 'cadre') {
+            // 新建/更新干部档案（已存在则保留原设备分，仅补职务）
+            const payload = cadre
+                ? { ...cadre, position: it.position || cadre.position || '', department: it.department || cadre.department || '', major: it.major || cadre.major || '' }
+                : { name: it.name.trim(), department: it.department || '', major: it.major || '', position: it.position || '', equipment_score: 0 };
+            const { data, error } = await sb.rpc('upsert_cadre', { p_password: adminPwd, p_cadre: payload });
+            if (error) throw new Error('干部档案保存失败：' + error.message);
+            if (!cadre) state.cadres.push(data);
+            cadre = data;
+            recordTable = 'cadres'; recordId = data.id;
+        } else if (it.type === 'deduction') {
+            if (!it.reason.trim()) throw new Error('扣分原因为空');
+            if (!(it.score > 0)) throw new Error('扣分必须大于 0');
+            const { data, error } = await sb.rpc('add_deduction', {
+                p_password: adminPwd,
+                p_data: { cadre_id: cadre.id, score: it.score, reason: it.reason.trim() }
+            });
+            if (error) throw new Error(error.message);
+            recordTable = 'deductions'; recordId = data.id;
+        }
+    }
+
+    // 4. 图片存档登记（名单拆分行跳过，原图行统一归档）
+    if (!it.skipImage) {
+        const { error: imgErr } = await sb.rpc('save_import_image', {
+            p_password: adminPwd,
+            p_data: {
+                cadre_id: cadre ? cadre.id : '',
+                record_table: recordTable,
+                record_id: recordId,
+                storage_path: path,
+                public_url: publicUrl,
+                description: $('batchDesc').value.trim(),
+                ai_summary: it.aiSummary
+            }
+        });
+        if (imgErr) throw new Error('图片存档失败：' + imgErr.message);
+    }
+}
+
+// ------------------------- 图片存档库 -------------------------
+async function loadGallery() {
+    const g = $('gallery');
+    try {
+        const { data, error } = await sb
+            .from('import_images')
+            .select('*, cadres(name)')
+            .order('created_at', { ascending: false })
+            .limit(60);
+        if (error) throw error;
+        if (!data || !data.length) { g.innerHTML = '<p class="muted">暂无存档图片，保存后会自动出现在这里</p>'; return; }
+        g.innerHTML = data.map(r => `
+            <div class="gallery-item">
+                <img src="${esc(r.public_url || '')}" alt="" onclick="window.open('${esc(r.public_url || '')}','_blank')" onerror="this.style.opacity=0.3">
+                <div class="g-info">
+                    <div class="g-title">${esc(r.cadres ? r.cadres.name : '未关联干部')} <span class="type-badge">${esc(TYPE_LABEL[r.record_table === 'cadres' ? 'equipment' : r.record_table === 'competitions' ? 'competition' : r.record_table === 'contributions' ? 'contribution' : r.record_table === 'trainings' ? 'training' : r.record_table === 'deductions' ? 'deduction' : 'image_only'])}</span></div>
+                    <div class="g-meta">${esc(r.ai_summary || '')}</div>
+                    <div class="g-meta">${esc((r.created_at || '').slice(0, 16).replace('T', ' '))}</div>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        g.innerHTML = `<p class="muted">图片库加载失败：${esc(e.message)}</p>`;
+    }
+}
+
+// ------------------------- 启动 -------------------------
+init();
+</script>
+</body>
+</html>

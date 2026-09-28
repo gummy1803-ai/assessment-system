@@ -1,0 +1,20 @@
+# ===== 敏感配置（含真实密钥，禁止上传）=====
+config.js
+
+# ===== 数据文件（含真实人员数据，禁止上传）=====
+*.db
+*.db-journal
+干部考核数据*.json
+
+# ===== 依赖目录 =====
+node_modules/
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 编辑器 =====
+.vscode/
+.idea/
+*.swp
