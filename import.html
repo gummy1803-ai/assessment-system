@@ -135,7 +135,7 @@
 
         .field-label { display: block; font-weight: bold; color: #444; margin: 18px 0 8px; }
 
-        textarea, input[type="text"], input[type="number"], input[type="password"], select {
+        textarea, input[type="text"], input[type="number"], input[type="password"], input[type="date"], select {
             padding: 9px 11px;
             border: 1px solid #ccc;
             border-radius: 8px;
@@ -258,7 +258,7 @@
                     <thead>
                         <tr>
                             <th>图片</th><th>记录类型</th><th>干部</th><th>部门</th>
-                            <th>内容</th><th>分数</th><th>AI 识别说明</th><th>状态</th><th>操作</th>
+                            <th>内容</th><th>分值</th><th>AI 识别说明</th><th>状态</th><th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="reviewBody"></tbody>
@@ -291,26 +291,67 @@
 
 <script>
 /* ============================================================================
- * 智能导入工作台
+ * 智能导入工作台（六维考核 v3.0）
  * 流程：上传图片 → 压缩后送 AI 视觉模型识别 → 结构化结果人工核对 →
- *       图片存 Supabase Storage → 考核记录走密码校验 RPC → 图片存档表留档
+ *       图片存 Supabase Storage → 六维加分/扣分走密码校验 RPC → 图片存档表留档
  * ========================================================================== */
+
+// ------------------------- 六维结构硬编码（结构固定，分值仅供默认参考） -------------------------
+const SIX_DIMS = {
+    A: { name: '智慧学习', items: {
+        A1: { name: 'AI应用', max: 20 }, A2: { name: '专业课程', max: 20 },
+        A3: { name: '办公与数据工具', max: 15 }, A4: { name: '多媒体制作', max: 10 },
+        A5: { name: '科技文档', max: 15 }, A6: { name: '实践课程建设', max: 20 }
+    }},
+    B: { name: '学科竞赛', items: {
+        B1: { name: '有效参赛', max: 20 }, B2: { name: '竞赛获奖', max: 30 },
+        B3: { name: '技术贡献', max: 30 }, B4: { name: '跨学科整合', max: 20 }
+    }},
+    C: { name: '实践能力', items: {
+        C1: { name: '安全知识与习惯', max: 25 }, C2: { name: '设备与工艺操作', max: 25 },
+        C3: { name: 'CAD/CAE/CAM', max: 20 }, C4: { name: '实验与数据分析', max: 20 },
+        C5: { name: '设备维护与改进更新', max: 10 }
+    }},
+    D: { name: '团队协作', items: {
+        D1: { name: '团队任务交付', max: 30 }, D2: { name: '团队组织协调', max: 20 },
+        D3: { name: '团队沟通与展示', max: 20 }, D4: { name: '协会共同活动', max: 15 },
+        D5: { name: '协会团建活动', max: 15 }
+    }},
+    E: { name: '研究创新', items: {
+        E1: { name: '课题方案设计', max: 20 }, E2: { name: '学术论文', max: 20 },
+        E3: { name: '知识产权(专利)', max: 15 }, E4: { name: '研究报告(设计说明书)', max: 30 },
+        E5: { name: '成果转化', max: 15 }
+    }},
+    F: { name: '履职助新', items: {
+        F1: { name: '部门岗位与服务任务', max: 35 }, F2: { name: '带新与培训', max: 25 },
+        F3: { name: '资料与经验传承', max: 15 }, F4: { name: '服务改进', max: 10 },
+        F5: { name: '协会宣传与推广', max: 15 }
+    }}
+};
+
+// 扣分项 K1-K12：fixedDim=固定归属维度；dynamic=动态归属（录入人选）
+const DEDUCTION_ITEMS = {
+    K1: { name: '无故迟到/早退', fixedDim: 'F' }, K2: { name: '无故缺席', fixedDim: 'F' },
+    K3: { name: '未履行承诺任务', fixedDim: 'F' }, K4: { name: '逾期归还物资', fixedDim: 'F' },
+    K5: { name: '私自外借物资', fixedDim: 'F' },
+    K6: { name: '违反安全操作', fixedDim: 'C' }, K7: { name: '隐瞒设备损坏丢失', fixedDim: 'C' },
+    K8: { name: '代签/虚假出勤', fixedDim: 'F' },
+    K9: { name: '伪造篡改证明', dynamic: true }, K10: { name: '冒领他人成果', dynamic: true },
+    K11: { name: '未按规定着装或防护', fixedDim: 'C' }, K12: { name: '离开未关电关灯', fixedDim: 'F' }
+};
 
 // ------------------------- 全局状态 -------------------------
 let sb = null;                       // Supabase 客户端
 let adminPwd = sessionStorage.getItem('import_adminPwd') || '';
 let pwdVerified = false;
-let state = { cadres: [], rules: null };
+let state = { cadres: [] };
 let items = [];                      // 待处理图片：{id, file, url, desc, type, fields..., aiSummary, status, msg}
 
 const TYPES = [
-    { v: 'competition', label: '🏆 比赛成绩', table: 'competitions', rpc: 'add_competition' },
-    { v: 'contribution', label: '🤝 协会贡献', table: 'contributions', rpc: 'add_contribution' },
-    { v: 'training',    label: '👨‍🏫 新生指导', table: 'trainings',    rpc: 'add_training' },
-    { v: 'deduction',   label: '⚠️ 职责扣分', table: 'deductions',   rpc: 'add_deduction' },
-    { v: 'equipment',   label: '🔧 设备分',   table: 'cadres',       rpc: 'upsert_cadre' },
-    { v: 'cadre',       label: '👤 新建干部', table: 'cadres',       rpc: 'upsert_cadre' },
-    { v: 'image_only',  label: '🖼️ 仅存图片', table: '',             rpc: '' }
+    { v: 'score',      label: '✅ 六维加分', table: 'score_records',     rpc: 'add_score_record' },
+    { v: 'deduction',  label: '⚠️ 扣分记录', table: 'deduction_records', rpc: 'add_deduction_record' },
+    { v: 'cadre',      label: '👤 新建干部', table: 'cadres',           rpc: 'upsert_cadre' },
+    { v: 'image_only', label: '🖼️ 仅存图片', table: '',                rpc: '' }
 ];
 const TYPE_LABEL = Object.fromEntries(TYPES.map(t => [t.v, t.label]));
 
@@ -345,6 +386,17 @@ function setPwd(ok, text) {
     $('pwdText').textContent = text;
 }
 
+function str(v) { return (v === null || v === undefined) ? '' : String(v).trim(); }
+function num(v, dft) { const n = parseFloat(v); return isNaN(n) ? dft : n; }
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// 取分项上限（用于输入框 max 提示）
+function itemMax(dim, item) {
+    const d = SIX_DIMS[dim];
+    if (!d || !d.items[item]) return 100;
+    return d.items[item].max;
+}
+
 // ------------------------- 初始化 -------------------------
 async function init() {
     const cfg = window.SUPABASE_CONFIG;
@@ -361,14 +413,10 @@ async function init() {
 
     try {
         sb = window.supabase.createClient(cfg.url, cfg.anonKey);
-        // 连通性检测：读 settings 计分规则 + 人员名单
-        const [cadresRes, rulesRes] = await Promise.all([
-            sb.from('cadres').select('*').order('created_at', { ascending: true }),
-            sb.from('settings').select('value').eq('key', 'scoringRules').maybeSingle()
-        ]);
-        if (cadresRes.error) throw cadresRes.error;
-        state.cadres = cadresRes.data || [];
-        state.rules = rulesRes.data ? safeJson(rulesRes.data.value) : null;
+        // 连通性检测：读人员名单（六维结构前端硬编码，不依赖 settings）
+        const { data: cadreData, error: cadreErr } = await sb.from('cadres').select('*').order('created_at', { ascending: true });
+        if (cadreErr) throw cadreErr;
+        state.cadres = cadreData || [];
         setConn('ok', '已连接');
     } catch (e) {
         setConn('err', '连接失败');
@@ -376,11 +424,10 @@ async function init() {
         return;
     }
 
+    refreshDatalist();
     await ensurePassword();
     loadGallery();
 }
-
-function safeJson(s) { try { return JSON.parse(s); } catch { return null; } }
 
 function showSetupBanner(html) {
     const b = $('setupBanner');
@@ -446,18 +493,26 @@ const dz = $('dropZone');
 ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
 dz.addEventListener('drop', e => addFiles(e.dataTransfer.files));
 
+function newItem(file) {
+    return {
+        id: uid(), file, url: URL.createObjectURL(file), desc: '',
+        type: 'score', name: '', department: '', major: '', position: '', skipImage: false,
+        // 六维加分字段
+        dimCode: 'A', itemCode: 'A1',
+        activityName: '', activityDate: '', taskDesc: '', outputDesc: '', evidenceRef: '',
+        nominalScore: 0,
+        // 扣分字段
+        deduItem: 'K1', targetDim: 'F',
+        eventDate: '', factDesc: '', clauseRef: '', toldDate: '', memberStatement: '',
+        nominalDeduction: 0,
+        aiSummary: '', status: '待识别', msg: ''
+    };
+}
+
 function addFiles(fileList) {
     const files = [...fileList].filter(f => f.type.startsWith('image/'));
     if (!files.length) return;
-    for (const f of files) {
-        items.push({
-            id: uid(), file: f, url: URL.createObjectURL(f), desc: '',
-            type: 'unknown', name: '', department: '', position: '', major: '', skipImage: false,
-            cName: '', level: '', award: '', cType: '', count: 1,
-            trainee: '', hours: 1, reason: '', score: 0, equip: 0,
-            aiSummary: '', status: '待识别', msg: ''
-        });
-    }
+    for (const f of files) items.push(newItem(f));
     renderThumbs();
     toast(`已添加 ${files.length} 张图片`, 'success');
 }
@@ -487,24 +542,35 @@ function renderThumbs() {
 // ------------------------- AI 识别 -------------------------
 $('analyzeBtn').addEventListener('click', runAnalysis);
 
-const AI_PROMPT_TEMPLATE = `你是干部考核系统的单据识别助手。请识别图片中的关键信息，严格只输出 JSON（不要 markdown 代码块、不要多余文字），分两种情况：
+const AI_PROMPT_TEMPLATE = `你是机电协会干部考核系统的单据识别助手。系统采用六维加权模型：A智慧学习/B学科竞赛/C实践能力/D团队协作/E研究创新/F履职助新。请识别图片中的关键信息，严格只输出 JSON（不要 markdown 代码块、不要多余文字），分两种情况：
 
-【情况一：单人单据（获奖证书、值班表、培训记录、扣分通知等）】输出一个 JSON 对象：
-{"cadre_name":"干部姓名，识别不出填空字符串","department":"部门","major":"专业，识别不出填空字符串","position":"职务","record_type":"competition|contribution|training|deduction|equipment|unknown","name":"比赛名称","level":"国家级|省级|校级","award":"一等奖|二等奖|三等奖","contribution_type":"贡献类型，如值班、维修、活动组织","count":1,"trainee_name":"被指导新生姓名","hours":1,"reason":"扣分原因","score":0,"equipment_score":0,"summary":"一句话概括图片内容"}
+【情况一：单人单据（加分证明、扣分通知等）】输出一个 JSON 对象：
+{"cadre_name":"干部姓名，识别不出填空字符串","department":"部门","major":"所学专业，识别不出填空字符串","position":"头衔职务","record_type":"score|deduction|cadre|unknown","dim_code":"A|B|C|D|E|F（score 必填）","item_code":"A1-F6 等（score 必填）","activity_name":"活动/比赛/任务名称","activity_date":"YYYY-MM-DD","task_desc":"本人承担任务","output_desc":"实际输出","evidence_ref":"证据名称及位置","nominal_score":0,"deduction_item":"K1-K12（deduction 必填）","target_dim_code":"A-F（deduction 必填，K9-K10 动态归属必选，K1-K5/K8/K12 固定F，K6-K7/K11 固定C）","event_date":"YYYY-MM-DD","fact_desc":"事实描述","clause_ref":"适用条款","told_date":"YYYY-MM-DD","member_statement":"本人陈述","nominal_deduction":0,"summary":"一句话概括图片内容"}
+
+六维分项对照表：
+A 智慧学习：A1 AI应用/A2 专业课程/A3 办公与数据工具/A4 多媒体制作/A5 科技文档/A6 实践课程建设
+B 学科竞赛：B1 有效参赛/B2 竞赛获奖/B3 技术贡献/B4 跨学科整合
+C 实践能力：C1 安全知识与习惯/C2 设备与工艺操作/C3 CAD-CAE-CAM/C4 实验与数据分析/C5 设备维护与改进更新
+D 团队协作：D1 团队任务交付/D2 团队组织协调/D3 团队沟通与展示/D4 协会共同活动/D5 协会团建活动
+E 研究创新：E1 课题方案设计/E2 学术论文/E3 知识产权专利/E4 研究报告设计说明书/E5 成果转化
+F 履职助新：F1 部门岗位与服务任务/F2 带新与培训/F3 资料与经验传承/F4 服务改进/F5 协会宣传与推广
+扣分项 K1-K12：K1 无故迟到早退/K2 无故缺席/K3 未履行承诺任务/K4 逾期归还物资/K5 私自外借物资（K1-K5 归 F 履职助新维）；K6 违反安全操作/K7 隐瞒设备损坏丢失（K6-K7 归 C 实践能力维）；K8 代签虚假出勤（归 F）；K9 伪造篡改证明/K10 冒领他人成果（动态归属，需选 A-F）；K11 未按规定着装或防护（归 C）；K12 离开未关电关灯（归 F）
 
 【情况二：成员名单、名册表格、多人列表截图】输出 JSON 数组，每个人一项：
-[{"cadre_name":"姓名","department":"部门，机构名称如办公室/财资部/宣传部/电控部","major":"专业，如电气工程及其自动化，识别不出填空字符串","position":"职务，头衔词如会长/副会长/部长/副部长/干事","record_type":"cadre","summary":"简短"}]
+[{"cadre_name":"姓名","department":"部门，机构名称如办公室/财资部/宣传部/电控部","major":"所学专业，如电气工程及其自动化，识别不出填空字符串","position":"职务，头衔词如会长/副会长/部长/副部长/干事","record_type":"cadre","summary":"简短"}]
 
 识别规则：
 - 三个人员字段必须严格区分：department=所属机构/部门（办公室、财资部、宣传部等机构名）；position=头衔职务（会长、副会长、部长、干事等头衔词）；major=所学专业（如电气工程及其自动化）。名单里某一列若全是会长/部长这类头衔词，一律归入 position，绝不能填进 department；专业列缺失时 major 留空
-- 获奖证书、比赛奖状照片 → competition，提取比赛名称、级别、奖项
-- 值班表、服务记录、维修单、活动照片 → contribution，提取类型与次数
-- 培训签到、带新生照片 → training，提取新生姓名与指导小时数
-- 扣分通知、违纪记录 → deduction，提取原因与分数
-- 设备照片、器材清单 → equipment，并给出 0-1000 的 equipment_score 建议
+- 获奖证书、比赛奖状照片 → score，dim_code=B，item_code=B2（竞赛获奖）
+- 值班表、服务记录、维修单、活动照片 → score，dim_code=F，item_code=F1（岗位服务）
+- 培训签到、带新生照片 → score，dim_code=F，item_code=F2（带新培训）
+- AI 应用截图、办公文档、多媒体作品、技术文档 → score，按内容归 A1-A6
+- CAD 图纸、实验数据、故障案例 → score，按内容归 C2-C5
+- 论文、专利、应用转化证明 → score，按内容归 E3-E5
+- 扣分通知、违纪记录 → deduction，按事实归 K1-K12
 - 成员名单、群成员截图、多人名册 → 输出数组，每人 record_type=cadre，电话号码忽略
 - 无法判断 → 单个对象，record_type=unknown
-- 看不出来的字段填空字符串或 0；所有数字必须是数字类型，不能是字符串`;
+- 看不出来的字段填空字符串或 0；所有数字必须是数字类型，不能是字符串；日期必须是 YYYY-MM-DD 格式`;
 
 async function runAnalysis() {
     if (!items.length) return;
@@ -532,14 +598,17 @@ async function runAnalysis() {
                 it.aiSummary = `识别到 ${list.length} 位成员，已拆分为独立行`;
                 it.status = '已识别';
                 list.forEach((p, idx) => {
-                    items.push({
-                        id: uid(), file: it.file, url: it.url, desc: '',
-                        type: 'cadre', name: str(p.cadre_name), department: str(p.department),
-                        major: str(p.major), position: str(p.position),
-                        cName: '', level: '', award: '', cType: '', count: 1,
-                        trainee: '', hours: 1, reason: '', score: 0, equip: 0,
-                        aiSummary: `名单成员 ${idx + 1}/${list.length}`, status: '已识别', msg: '', skipImage: true
-                    });
+                    const n = newItem(it.file);
+                    n.url = it.url;
+                    n.skipImage = true;
+                    n.type = 'cadre';
+                    n.name = str(p.cadre_name);
+                    n.department = str(p.department);
+                    n.major = str(p.major);
+                    n.position = str(p.position);
+                    n.aiSummary = `名单成员 ${idx + 1}/${list.length}`;
+                    n.status = '已识别';
+                    items.push(n);
                 });
             } else {
                 applyAIResult(it, list[0]);
@@ -549,7 +618,6 @@ async function runAnalysis() {
             it.status = '识别失败';
             it.msg = e.message;
             fail++;
-            // CORS / 网络错误时提示更友好，且中断后续请求
             if (e.message.includes('Failed to fetch')) {
                 it.msg = '无法连接 AI 接口（网络/CORS），请检查网络或更换 AI_CONFIG.url';
                 toast(it.msg, 'error', 6000);
@@ -670,39 +738,38 @@ function applyAIResult(it, ai) {
     it.department = str(ai.department);
     it.major = str(ai.major);
     it.position = str(ai.position);
-    const type = TYPES.some(t => t.v === ai.record_type) ? ai.record_type : 'unknown';
-    it.type = type === 'unknown' ? 'image_only' : type;
-    it.cName = str(ai.name);
-    it.level = ['国家级', '省级', '校级'].includes(ai.level) ? ai.level : '';
-    it.award = ['一等奖', '二等奖', '三等奖'].includes(ai.award) ? ai.award : '';
-    it.cType = str(ai.contribution_type);
-    it.count = num(ai.count, 1);
-    it.trainee = str(ai.trainee_name);
-    it.hours = num(ai.hours, 1);
-    it.reason = str(ai.reason);
-    it.equip = Math.min(1000, Math.max(0, num(ai.equipment_score, 0)));
-    it.score = num(ai.score, 0);
-    if (it.type === 'competition') it.score = suggestScore(it);
-    if (it.type === 'contribution') it.score = round1(it.count * contribRate(it.cType));
-    if (it.type === 'training') it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
+    const rt = TYPES.some(t => t.v === ai.record_type) ? ai.record_type : 'unknown';
+    it.type = rt === 'unknown' ? 'image_only' : rt;
+
+    // 六维加分字段
+    const dim = ['A','B','C','D','E','F'].includes(ai.dim_code) ? ai.dim_code : 'A';
+    it.dimCode = dim;
+    const item = str(ai.item_code);
+    it.itemCode = (SIX_DIMS[dim] && SIX_DIMS[dim].items[item]) ? item : Object.keys(SIX_DIMS[dim].items)[0];
+    it.activityName = str(ai.activity_name);
+    it.activityDate = str(ai.activity_date);
+    it.taskDesc = str(ai.task_desc);
+    it.outputDesc = str(ai.output_desc);
+    it.evidenceRef = str(ai.evidence_ref);
+    it.nominalScore = Math.min(itemMax(it.dimCode, it.itemCode), Math.max(0, num(ai.nominal_score, 0)));
+
+    // 扣分字段
+    const di = str(ai.deduction_item);
+    it.deduItem = DEDUCTION_ITEMS[di] ? di : 'K1';
+    // 归属维度：K9-K10 用 AI 给的 target_dim_code；固定项按 DEDUCTION_ITEMS 的 fixedDim 锁定
+    if (DEDUCTION_ITEMS[it.deduItem] && DEDUCTION_ITEMS[it.deduItem].fixedDim) {
+        it.targetDim = DEDUCTION_ITEMS[it.deduItem].fixedDim;
+    } else {
+        it.targetDim = ['A','B','C','D','E','F'].includes(ai.target_dim_code) ? ai.target_dim_code : 'F';
+    }
+    it.eventDate = str(ai.event_date);
+    it.factDesc = str(ai.fact_desc);
+    it.clauseRef = str(ai.clause_ref);
+    it.toldDate = str(ai.told_date);
+    it.memberStatement = str(ai.member_statement);
+    it.nominalDeduction = Math.min(1000, Math.max(0, num(ai.nominal_deduction, 0)));
+
     it.aiSummary = str(ai.summary) || '（AI 未给出说明）';
-}
-
-function str(v) { return (v === null || v === undefined) ? '' : String(v).trim(); }
-function num(v, dft) { const n = parseFloat(v); return isNaN(n) ? dft : n; }
-
-function contribRate(type) {
-    const rates = state.rules?.contributionTypeRates;
-    if (type && rates && rates[type] !== undefined) return num(rates[type], 0.1);
-    return num(state.rules?.contributionPerCount, 0.1);
-}
-function round1(n) { return Math.round(n * 10) / 10; }
-
-// 按计分规则自动算比赛分
-function suggestScore(it) {
-    const comp = state.rules && state.rules.competitions;
-    if (comp && comp[it.level] && comp[it.level][it.award] !== undefined) return comp[it.level][it.award];
-    return it.score || 0;
 }
 
 // ------------------------- 核对表渲染 -------------------------
@@ -723,7 +790,7 @@ function renderReview() {
             <td>${contentCell(it)}</td>
             <td>${scoreCell(it)}</td>
             <td><div class="ai-sum" title="${esc(it.msg || it.aiSummary)}">${esc(it.aiSummary)}${it.msg ? `<br><span style="color:#dc3545">${esc(it.msg)}</span>` : ''}</div></td>
-            <td><span class="row-status ${statusClass(it.status)}">${esc(it.status)}${it.msg && it.status.includes('失败') ? '' : ''}</span></td>
+            <td><span class="row-status ${statusClass(it.status)}">${esc(it.status)}</span></td>
             <td><button class="btn danger-sm" onclick="removeItem('${it.id}')">删除</button></td>
         </tr>`;
     }).join('');
@@ -740,30 +807,46 @@ function statusClass(s) {
 
 function contentCell(it) {
     switch (it.type) {
-        case 'competition': return `
-            <input type="text" placeholder="比赛名称" value="${esc(it.cName)}" style="min-width:130px;margin-bottom:4px;"
-                   oninput="items.find(x=>x.id==='${it.id}').cName=this.value">
-            <select onchange="onCompChange('${it.id}')">
-                <option value="">级别</option>
-                ${['国家级','省级','校级'].map(v => `<option ${v===it.level?'selected':''}>${v}</option>`).join('')}
-            </select>
-            <select onchange="onCompChange('${it.id}')" style="margin-top:4px;">
-                <option value="">奖项</option>
-                ${['一等奖','二等奖','三等奖'].map(v => `<option ${v===it.award?'selected':''}>${v}</option>`).join('')}
-            </select>`;
-        case 'contribution': return `
-            <input type="text" placeholder="贡献类型" value="${esc(it.cType)}" style="min-width:110px;margin-bottom:4px;"
-                   oninput="items.find(x=>x.id==='${it.id}').cType=this.value">
-            <input type="number" min="1" max="100" value="${it.count}" style="width:70px;" title="次数"
-                   oninput="onCountChange('${it.id}', this.value)"> 次`;
-        case 'training': return `
-            <input type="text" placeholder="新生姓名" value="${esc(it.trainee)}" style="min-width:110px;margin-bottom:4px;"
-                   oninput="items.find(x=>x.id==='${it.id}').trainee=this.value">
-            <input type="number" min="0.5" max="100" step="0.5" value="${it.hours}" style="width:70px;" title="小时"
-                   oninput="onHoursChange('${it.id}', this.value)"> 小时`;
-        case 'deduction': return `
-            <input type="text" placeholder="扣分原因" value="${esc(it.reason)}" style="min-width:140px;"
-                   oninput="items.find(x=>x.id==='${it.id}').reason=this.value">`;
+        case 'score': {
+            const dimOpts = Object.entries(SIX_DIMS).map(([k,v]) => `<option value="${k}" ${k===it.dimCode?'selected':''}>${k} ${v.name}</option>`).join('');
+            const items = SIX_DIMS[it.dimCode] ? SIX_DIMS[it.dimCode].items : {};
+            const itemOpts = Object.entries(items).map(([k,v]) => `<option value="${k}" ${k===it.itemCode?'selected':''}>${k} ${v.name}（≤${v.max}）</option>`).join('');
+            return `
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:200px;">
+                    <select onchange="onDimChange('${it.id}', this.value)">${dimOpts}</select>
+                    <select onchange="items.find(x=>x.id==='${it.id}').itemCode=this.value; onItemChange('${it.id}')">${itemOpts}</select>
+                    <input type="text" placeholder="活动/任务名称" value="${esc(it.activityName)}"
+                           oninput="items.find(x=>x.id==='${it.id}').activityName=this.value">
+                    <input type="date" value="${esc(it.activityDate)}"
+                           oninput="items.find(x=>x.id==='${it.id}').activityDate=this.value">
+                    <input type="text" placeholder="本人承担任务" value="${esc(it.taskDesc)}"
+                           oninput="items.find(x=>x.id==='${it.id}').taskDesc=this.value">
+                    <input type="text" placeholder="实际输出" value="${esc(it.outputDesc)}"
+                           oninput="items.find(x=>x.id==='${it.id}').outputDesc=this.value">
+                    <input type="text" placeholder="证据名称及位置" value="${esc(it.evidenceRef)}"
+                           oninput="items.find(x=>x.id==='${it.id}').evidenceRef=this.value">
+                </div>`;
+        }
+        case 'deduction': {
+            const kOpts = Object.entries(DEDUCTION_ITEMS).map(([k,v]) => `<option value="${k}" ${k===it.deduItem?'selected':''}>${k} ${v.name}${v.fixedDim?`（归 ${v.fixedDim}）`:`（动态归属）`}</option>`).join('');
+            const dyn = DEDUCTION_ITEMS[it.deduItem] && !DEDUCTION_ITEMS[it.deduItem].fixedDim;
+            const dimOpts = ['A','B','C','D','E','F'].map(k => `<option value="${k}" ${k===it.targetDim?'selected':''}>${k} ${SIX_DIMS[k].name}</option>`).join('');
+            return `
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:200px;">
+                    <select onchange="onDeduChange('${it.id}', this.value)">${kOpts}</select>
+                    ${dyn ? `<select onchange="items.find(x=>x.id==='${it.id}').targetDim=this.value">${dimOpts}</select>` : ''}
+                    <input type="date" placeholder="事件日期" value="${esc(it.eventDate)}"
+                           oninput="items.find(x=>x.id==='${it.id}').eventDate=this.value">
+                    <input type="text" placeholder="事实描述" value="${esc(it.factDesc)}"
+                           oninput="items.find(x=>x.id==='${it.id}').factDesc=this.value">
+                    <input type="text" placeholder="适用条款" value="${esc(it.clauseRef)}"
+                           oninput="items.find(x=>x.id==='${it.id}').clauseRef=this.value">
+                    <input type="date" placeholder="告知本人日期" value="${esc(it.toldDate)}"
+                           oninput="items.find(x=>x.id==='${it.id}').toldDate=this.value">
+                    <input type="text" placeholder="本人陈述" value="${esc(it.memberStatement)}"
+                           oninput="items.find(x=>x.id==='${it.id}').memberStatement=this.value">
+                </div>`;
+        }
         case 'cadre': return `
             <input type="text" placeholder="职务" value="${esc(it.position || '')}" style="min-width:100px;"
                    oninput="items.find(x=>x.id==='${it.id}').position=this.value">
@@ -774,13 +857,19 @@ function contentCell(it) {
 }
 
 function scoreCell(it) {
-    if (it.type === 'image_only' || it.type === 'cadre') return '<span style="color:#999">—</span>';
-    if (it.type === 'equipment') return `
-        <input type="number" class="score-input" min="0" max="1000" value="${it.equip}" style="width:85px;"
-               oninput="items.find(x=>x.id==='${it.id}').equip=Math.min(1000,Math.max(0,parseFloat(this.value)||0))" title="设备分 0-1000">`;
-    return `
-        <input type="number" class="score-input" min="0" max="1000" step="0.1" value="${it.score}" style="width:85px;"
-               oninput="items.find(x=>x.id==='${it.id}').score=Math.min(1000,Math.max(0,parseFloat(this.value)||0))">`;
+    if (it.type === 'cadre' || it.type === 'image_only') return '<span style="color:#999">—</span>';
+    if (it.type === 'score') {
+        const mx = itemMax(it.dimCode, it.itemCode);
+        return `
+            <input type="number" class="score-input" min="0" max="${mx}" step="0.5" value="${it.nominalScore}" style="width:85px;"
+                   oninput="items.find(x=>x.id==='${it.id}').nominalScore=Math.min(${mx},Math.max(0,parseFloat(this.value)||0))" title="名义分值 0-${mx}">`;
+    }
+    if (it.type === 'deduction') {
+        return `
+            <input type="number" class="score-input" min="0" max="1000" step="0.5" value="${it.nominalDeduction}" style="width:85px;"
+                   oninput="items.find(x=>x.id==='${it.id}').nominalDeduction=Math.min(1000,Math.max(0,parseFloat(this.value)||0))" title="名义扣分 0-1000">`;
+    }
+    return '';
 }
 
 function ensureDatalist() {
@@ -809,42 +898,40 @@ function onNameInput(id) {
 function onTypeChange(id, type) {
     const it = items.find(x => x.id === id);
     it.type = type;
-    if (type === 'competition') it.score = suggestScore(it);
-    if (type === 'contribution') it.score = round1(it.count * contribRate(it.cType));
-    if (type === 'training') it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
     renderReview();
 }
 
-function onCompChange(id) {
+// 切换维度：分项重置为该维第一项，名义分值按上限 clamp
+function onDimChange(id, dim) {
     const it = items.find(x => x.id === id);
-    const row = document.querySelector(`tr[data-id="${id}"]`);
-    const selects = row.querySelectorAll('td select');
-    it.level = selects[1] ? selects[1].value : it.level;   // 第0个是类型下拉
-    it.award = selects[2] ? selects[2].value : it.award;
-    it.score = suggestScore(it);
-    updateScoreInput(id, it);
+    it.dimCode = dim;
+    it.itemCode = Object.keys(SIX_DIMS[dim].items)[0];
+    it.nominalScore = Math.min(it.nominalScore, itemMax(it.dimCode, it.itemCode));
+    renderReview();
 }
 
-function onCountChange(id, v) {
+// 切换分项：名义分值按上限 clamp
+function onItemChange(id) {
     const it = items.find(x => x.id === id);
-    it.count = Math.min(100, Math.max(1, parseInt(v) || 1));
-    it.score = round1(it.count * contribRate(it.cType));
-    updateScoreInput(id, it);
-}
-
-function onHoursChange(id, v) {
-    const it = items.find(x => x.id === id);
-    it.hours = Math.min(100, Math.max(0.5, parseFloat(v) || 1));
-    it.score = round1(it.hours * (state.rules?.trainingPerHour ?? 0.5));
-    updateScoreInput(id, it);
-}
-
-// 局部更新分数输入框（不重渲染整表，避免输入焦点丢失）
-function updateScoreInput(id, it) {
+    it.nominalScore = Math.min(it.nominalScore, itemMax(it.dimCode, it.itemCode));
     const row = document.querySelector(`tr[data-id="${id}"]`);
     if (!row) return;
     const scoreInput = row.querySelector('.score-input');
-    if (scoreInput) scoreInput.value = it.score;
+    if (scoreInput) {
+        const mx = itemMax(it.dimCode, it.itemCode);
+        scoreInput.max = mx;
+        scoreInput.value = it.nominalScore;
+        scoreInput.title = `名义分值 0-${mx}`;
+    }
+}
+
+// 切换扣分项：固定归属项自动锁维度，K9/K10 显示动态选择
+function onDeduChange(id, k) {
+    const it = items.find(x => x.id === id);
+    it.deduItem = k;
+    const meta = DEDUCTION_ITEMS[k];
+    if (meta && meta.fixedDim) it.targetDim = meta.fixedDim;
+    renderReview();
 }
 
 // ------------------------- 保存归档 -------------------------
@@ -880,7 +967,7 @@ async function saveAll() {
 }
 
 async function saveOne(it) {
-    // 1. 干部：不存在则自动创建
+    // 1. 干部：不存在则自动创建（image_only 跳过）
     let cadre = state.cadres.find(x => x.name === it.name.trim());
     if (!cadre && it.type !== 'image_only') {
         if (!it.name.trim()) throw new Error('干部姓名为空，无法保存');
@@ -907,40 +994,43 @@ async function saveOne(it) {
     let recordTable = '', recordId = '';
     const t = TYPES.find(x => x.v === it.type);
     if (t && t.rpc) {
-        if (it.type === 'equipment') {
-            const { data, error } = await sb.rpc('upsert_cadre', {
+        if (it.type === 'score') {
+            if (!cadre) throw new Error('请先填写干部姓名');
+            const mx = itemMax(it.dimCode, it.itemCode);
+            if (it.nominalScore > mx) throw new Error(`名义分值 ${it.nominalScore} 超过该分项上限 ${mx}`);
+            const { data, error } = await sb.rpc('add_score_record', {
                 p_password: adminPwd,
-                p_cadre: { ...cadre, equipment_score: it.equip }
-            });
-            if (error) throw new Error('设备分保存失败：' + error.message);
-            Object.assign(cadre, data);
-            recordTable = 'cadres'; recordId = cadre.id;
-        } else if (it.type === 'competition') {
-            if (!it.cName.trim()) throw new Error('比赛名称为空');
-            const { data, error } = await sb.rpc('add_competition', {
-                p_password: adminPwd,
-                p_data: { cadre_id: cadre.id, name: it.cName.trim(), level: it.level, award: it.award, score: it.score }
-            });
-            if (error) throw new Error(error.message);
-            recordTable = 'competitions'; recordId = data.id;
-        } else if (it.type === 'contribution') {
-            if (!it.cType.trim()) throw new Error('贡献类型为空');
-            const { data, error } = await sb.rpc('add_contribution', {
-                p_password: adminPwd,
-                p_data: { cadre_id: cadre.id, type: it.cType.trim(), count: it.count, total_score: it.score }
+                p_member_id: cadre.id,
+                p_dim_code: it.dimCode,
+                p_item_code: it.itemCode,
+                p_activity_name: it.activityName || '',
+                p_activity_date: it.activityDate || null,
+                p_task_desc: it.taskDesc || '',
+                p_output_desc: it.outputDesc || '',
+                p_evidence_ref: it.evidenceRef || '',
+                p_nominal_score: it.nominalScore
             });
             if (error) throw new Error(error.message);
-            recordTable = 'contributions'; recordId = data.id;
-        } else if (it.type === 'training') {
-            if (!it.trainee.trim()) throw new Error('新生姓名为空');
-            const { data, error } = await sb.rpc('add_training', {
+            recordTable = 'score_records'; recordId = data.id;
+        } else if (it.type === 'deduction') {
+            if (!cadre) throw new Error('请先填写干部姓名');
+            if (!(it.nominalDeduction > 0)) throw new Error('扣分必须大于 0');
+            const { data, error } = await sb.rpc('add_deduction_record', {
                 p_password: adminPwd,
-                p_data: { cadre_id: cadre.id, trainee_name: it.trainee.trim(), hours: it.hours, score: it.score }
+                p_member_id: cadre.id,
+                p_item_code: it.deduItem,
+                p_target_dim_code: it.targetDim,
+                p_event_date: it.eventDate || null,
+                p_fact_desc: it.factDesc || '',
+                p_clause_ref: it.clauseRef || '',
+                p_told_date: it.toldDate || null,
+                p_member_statement: it.memberStatement || '',
+                p_nominal_deduction: it.nominalDeduction
             });
             if (error) throw new Error(error.message);
-            recordTable = 'trainings'; recordId = data.id;
+            recordTable = 'deduction_records'; recordId = data.id;
         } else if (it.type === 'cadre') {
-            // 新建/更新干部档案（已存在则保留原设备分，仅补职务）
+            // 新建/更新干部档案（已存在则保留原数据，仅补职务/专业/部门）
             const payload = cadre
                 ? { ...cadre, position: it.position || cadre.position || '', department: it.department || cadre.department || '', major: it.major || cadre.major || '' }
                 : { name: it.name.trim(), department: it.department || '', major: it.major || '', position: it.position || '', equipment_score: 0 };
@@ -949,15 +1039,6 @@ async function saveOne(it) {
             if (!cadre) state.cadres.push(data);
             cadre = data;
             recordTable = 'cadres'; recordId = data.id;
-        } else if (it.type === 'deduction') {
-            if (!it.reason.trim()) throw new Error('扣分原因为空');
-            if (!(it.score > 0)) throw new Error('扣分必须大于 0');
-            const { data, error } = await sb.rpc('add_deduction', {
-                p_password: adminPwd,
-                p_data: { cadre_id: cadre.id, score: it.score, reason: it.reason.trim() }
-            });
-            if (error) throw new Error(error.message);
-            recordTable = 'deductions'; recordId = data.id;
         }
     }
 
@@ -990,15 +1071,20 @@ async function loadGallery() {
             .limit(60);
         if (error) throw error;
         if (!data || !data.length) { g.innerHTML = '<p class="muted">暂无存档图片，保存后会自动出现在这里</p>'; return; }
-        g.innerHTML = data.map(r => `
+        g.innerHTML = data.map(r => {
+            const t = r.record_table === 'score_records' ? 'score'
+                    : r.record_table === 'deduction_records' ? 'deduction'
+                    : r.record_table === 'cadres' ? 'cadre' : 'image_only';
+            return `
             <div class="gallery-item">
                 <img src="${esc(r.public_url || '')}" alt="" onclick="window.open('${esc(r.public_url || '')}','_blank')" onerror="this.style.opacity=0.3">
                 <div class="g-info">
-                    <div class="g-title">${esc(r.cadres ? r.cadres.name : '未关联干部')} <span class="type-badge">${esc(TYPE_LABEL[r.record_table === 'cadres' ? 'equipment' : r.record_table === 'competitions' ? 'competition' : r.record_table === 'contributions' ? 'contribution' : r.record_table === 'trainings' ? 'training' : r.record_table === 'deductions' ? 'deduction' : 'image_only'])}</span></div>
+                    <div class="g-title">${esc(r.cadres ? r.cadres.name : '未关联干部')} <span class="type-badge">${esc(TYPE_LABEL[t] || t)}</span></div>
                     <div class="g-meta">${esc(r.ai_summary || '')}</div>
                     <div class="g-meta">${esc((r.created_at || '').slice(0, 16).replace('T', ' '))}</div>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     } catch (e) {
         g.innerHTML = `<p class="muted">图片库加载失败：${esc(e.message)}</p>`;
     }
