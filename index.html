@@ -589,7 +589,7 @@ async function rpc(fnName, args = {}) {
 // 维度正向分 = Σ min(分项累计分, 该分项上限)
 // 维度正向分封顶 = min(维度正向分, 100)
 // 维度扣分 = 该维 deduction_records 的 nominal_deduction 之和
-// 维度净分 = max(0, 维度正向分封顶 - 维度扣分)
+// 维度净分 = 维度正向分封顶 - 维度扣分（可为负，确保扣分体现在总分）
 // 综合总分 = Σ(维度净分 × 权重)，round 2
 // ========================================================================
 function calculateMemberScore(memberId) {
@@ -620,7 +620,7 @@ function calculateMemberScore(memberId) {
         });
         positive = Math.min(positive, num(dimRule.max, 100));
         positiveByDim[dimCode] = positive;
-        netByDim[dimCode] = Math.max(0, positive - dedByDim[dimCode]);
+        netByDim[dimCode] = positive - dedByDim[dimCode];
     });
 
     // 综合总分 = Σ(净分 × 权重)
@@ -1244,21 +1244,48 @@ function importCadreExcel(input) {
     reader.onload = async function (e) {
         try {
             const data = new Uint8Array(e.target.result);
-            const sheet = XLSX.read(data, { type: 'array' });
-            const rows = XLSX.utils.sheet_to_json(sheet.Sheets[sheet.SheetNames[0]]);
-            if (!rows.length) { toast('Excel 为空', 'error'); return; }
+            const wb = XLSX.read(data, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            if (!aoa.length) { toast('Excel 为空', 'error'); return; }
+
+            // 表头 = 第一行非空单元格
+            const headers = aoa[0].map(h => String(h).trim());
+            const hasStd = headers.includes('姓名') && headers.includes('部门');
+            const toImport = []; // {name, department, position, major, class, grade}
+
+            if (hasStd) {
+                // 标准模板：有姓名/部门列
+                for (let i = 1; i < aoa.length; i++) {
+                    const row = aoa[i];
+                    const obj = {};
+                    headers.forEach((h, idx) => { obj[h] = String(row[idx] || '').trim(); });
+                    if (!obj['姓名']) continue;
+                    toImport.push({
+                        name: obj['姓名'],
+                        department: obj['部门'] || '未分类',
+                        position: obj['职务'] || '',
+                        major: obj['专业'] || '',
+                        class: obj['班级'] || '',
+                        grade: obj['级数'] || ''
+                    });
+                }
+            } else {
+                // 多列名单格式（如面试值班表）：列名作为部门，列值作为姓名
+                for (let c = 0; c < headers.length; c++) {
+                    const dept = headers[c] || '未分类';
+                    for (let r = 1; r < aoa.length; r++) {
+                        const name = String(aoa[r][c] || '').trim();
+                        if (name) toImport.push({ name, department: dept, position: '', major: '', class: '', grade: '' });
+                    }
+                }
+            }
+
+            if (!toImport.length) { toast('未找到可导入的姓名（请检查表格格式）', 'error'); return; }
+
             let count = 0;
-            for (const row of rows) {
-                if (!row['姓名'] || !row['部门']) continue;
-                const saved = await rpc('upsert_cadre', { p_cadre: {
-                    name: String(row['姓名']).trim(),
-                    department: String(row['部门']).trim(),
-                    position: row['职务'] ? String(row['职务']).trim() : '',
-                    major: row['专业'] ? String(row['专业']).trim() : '',
-                    class: row['班级'] ? String(row['班级']).trim() : '',
-                    grade: row['级数'] ? String(row['级数']).trim() : '',
-                    equipment_score: 0
-                }});
+            for (const item of toImport) {
+                const saved = await rpc('upsert_cadre', { p_cadre: { ...item, equipment_score: 0 } });
                 upsertLocal('cadres', saved);
                 count++;
             }
