@@ -531,8 +531,9 @@ let githubSettings = JSON.parse(localStorage.getItem('githubSettings') || 'null'
 // ========================================================================
 function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function num(v, d = 0) { const n = parseFloat(v); return isNaN(n) ? d : n; }
-function fmt(v) { return num(v).toFixed(1); }
-function fmt2(v) { return num(v).toFixed(2); }  // 综合总分保留两位小数（与规则"保留两位小数"一致）
+function stripNegZero(s) { return /^-0(\.0+)?$/.test(s) ? s.slice(1) : s; }  // 避免显示 -0.0
+function fmt(v) { return stripNegZero(num(v).toFixed(1)); }
+function fmt2(v) { return stripNegZero(num(v).toFixed(2)); }  // 综合总分保留两位小数（与规则"保留两位小数"一致）
 function isUuid(s) { return typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s); }
 function toast(message, type = 'info', duration = 2600) {
     const box = document.getElementById('toastContainer');
@@ -823,15 +824,15 @@ function updateOverview() {
         ['A','B','C','D','E','F'].forEach(d => sums[d] += s.netByDim[d] || 0);
     });
     document.getElementById('totalCadres').textContent = n;
-    document.getElementById('avgScore').textContent = (totalAll / n).toFixed(2);
+    document.getElementById('avgScore').textContent = fmt2(totalAll / n);
     document.getElementById('excellentCount').textContent = counts['优秀'];
     document.getElementById('goodCount').textContent = counts['良好'];
     document.getElementById('averageCount').textContent = counts['一般'];
     document.getElementById('poorCount').textContent = counts['待改进'];
     const dims = rules.dimensions || DEFAULT_RULES.dimensions;
     document.getElementById('overviewScores').innerHTML = ['A','B','C','D','E','F'].map(d => `
-        <div class="score-item"><div class="label">${d} ${esc(dims[d]?.name||'')}</div><h3>${(sums[d]/n).toFixed(1)}</h3><div class="label" style="opacity:0.7;">权重 ${((dims[d]?.weight||0)*100).toFixed(0)}%</div></div>
-    `).join('') + `<div class="score-item total-score"><div class="label">综合平均</div><h3>${(totalAll/n).toFixed(2)}</h3><div class="label" style="opacity:0.7;">满分 100</div></div>`;
+        <div class="score-item"><div class="label">${d} ${esc(dims[d]?.name||'')}</div><h3>${fmt(sums[d]/n)}</h3><div class="label" style="opacity:0.7;">权重 ${((dims[d]?.weight||0)*100).toFixed(0)}%</div></div>
+    `).join('') + `<div class="score-item total-score"><div class="label">综合平均</div><h3>${fmt2(totalAll/n)}</h3><div class="label" style="opacity:0.7;">满分 100</div></div>`;
 }
 
 // ---------------- 雷达图 ----------------
