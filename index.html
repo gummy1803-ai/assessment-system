@@ -454,7 +454,7 @@ const DEFAULT_RULES = {
             A3: { name: '办公与数据工具', max: 15, perItem: 5, maxCount: 3 },
             A4: { name: '多媒体制作', max: 10, perItem: 2, maxCount: 5 },
             A5: { name: '科技文档', max: 15, perItem: 3, maxCount: 5 },
-            A6: { name: '实践课程建设', max: 20, perItem: 5, maxCount: 4 }
+            A6: { name: '实践课程贡献', max: 20, perItem: 5, maxCount: 4 }
         }},
         B: { name: '学科竞赛', weight: 0.20, max: 100, items: {
             B1: { name: '有效参赛', max: 20, note: '报名+任务5，完赛再5，每项目≤10' },
@@ -467,33 +467,32 @@ const DEFAULT_RULES = {
             B3: { name: '技术贡献', max: 30, tiers: { '模块': 5, '子系统': 10, '关键系统': 15 } },
             B4: { name: '跨学科整合', max: 20, perItem: 10, maxCount: 2 }
         }},
-        C: { name: '实践能力', weight: 0.20, max: 100, items: {
+        C: { name: '实践能力', weight: 0.25, max: 100, items: {
             C1: { name: '安全知识与习惯', max: 25, parts: { '理论': 10, '实操': 10, '操作日': 5 } },
             C2: { name: '设备与工艺操作', max: 25, perItem: 5, maxCount: 5 },
             C3: { name: 'CAD/CAE/CAM', max: 20, perItem: 5, maxCount: 4 },
             C4: { name: '实验与数据分析', max: 20, perItem: 5, maxCount: 4 },
-            C5: { name: '设备维护与改进更新', max: 10, perItem: 5, maxCount: 2 }
+            C5: { name: '故障分析与改进', max: 10, perItem: 5, maxCount: 2 }
         }},
         D: { name: '团队协作', weight: 0.15, max: 100, items: {
             D1: { name: '团队任务交付', max: 30, perItem: 3, maxCount: 10 },
-            D2: { name: '团队组织协调', max: 20, perItem: 5, altPerItem: 10 },
-            D3: { name: '团队沟通与展示', max: 20, perItem: 5, altPerItem: 2 },
-            D4: { name: '协会共同活动', max: 15, tiers: { '参与': 1, '服务': 3, '主要组织': 5 } },
-            D5: { name: '协会团建活动', max: 15, note: '小型:参与1/发起主持2；中型:参与1/服务3/组织5；大型:参与2/服务4/组织8；取最高角色计一次' }
+            D2: { name: '组织协调', max: 25, perItem: 5, altPerItem: 10 },
+            D3: { name: '沟通与展示', max: 25, perItem: 5, altPerItem: 2 },
+            D4: { name: '协会共同活动', max: 20, tiers: { '参与': 1, '服务': 3, '主要组织': 5 } }
         }},
         E: { name: '研究创新', weight: 0.10, max: 100, items: {
-            E1: { name: '课题方案设计', max: 20, perItem: 5, maxCount: 4 },
-            E2: { name: '学术论文', max: 20, tiers: { '成稿': 10, '录用': 15, '发表': 20 }, note: '取最高档' },
-            E3: { name: '知识产权(专利)', max: 15, tiers: { '交底': 5, '受理': 8, '授权': 15 } },
-            E4: { name: '研究报告(设计说明书)', max: 30, perItem: 5, altPerItem: 10, note: '完成5/份，评审通过或采用10/份' },
-            E5: { name: '成果转化', max: 15, tiers: { '试用': 5, '采用': 10, '有效果': 15 } }
+            E1: { name: '问题与研究设计', max: 20, perItem: 5, maxCount: 4 },
+            E2: { name: '研究项目贡献', max: 30, perItem: 5, note: '里程碑5分/个，每项目≤15' },
+            E3: { name: '论文与研究报告', max: 20, tiers: { '报告': 5, '成稿': 10, '录用': 15, '发表': 20 }, note: '取最高档' },
+            E4: { name: '知识产权', max: 15, tiers: { '交底': 5, '受理': 8, '授权': 15 } },
+            E5: { name: '应用与转化', max: 15, tiers: { '试用': 5, '采用': 10, '有效果': 15 } }
         }},
-        F: { name: '履职助新', weight: 0.20, max: 100, items: {
-            F1: { name: '部门岗位与服务任务', max: 35, perItem: 2, altPerItem: 4 },
-            F2: { name: '带新与培训', max: 25, roles: { '主讲': 5, '助教': 2, '效果加成': 2 } },
-            F3: { name: '资料与经验传承', max: 15, perItem: 3, altPerItem: 5 },
-            F4: { name: '服务改进', max: 10, tiers: { '采纳': 2, '实施': 5, '有效果': 10 } },
-            F5: { name: '协会宣传与推广', max: 15, note: '转发0.5(≤5)；原创3+达标2(≤10)；发布:协会/学院5、校级8、市级及以上10取最高；专项宣传5；总上限15，不重复计分' }
+        F: { name: '履职助新', weight: 0.15, max: 100, items: {
+            F1: { name: '岗位与服务任务', max: 40, perItem: 2, altPerItem: 4 },
+            F2: { name: '带新与培训', max: 30, roles: { '主讲': 5, '助教': 2, '效果加成': 2 } },
+            F3: { name: '资料与经验传承', max: 20, perItem: 3, altPerItem: 5 },
+            F4: { name: '助力协会发展', max: 15, note: '有效宣传/转发1分/次；原创宣传或实质协助3分/项；突出贡献5分/项' },
+            F5: { name: '服务改进', max: 10, tiers: { '采纳': 2, '实施': 5, '有效果': 10 } }
         }}
     },
     deductions: {
@@ -681,7 +680,7 @@ async function loadAll() {
         sb.from('cadres').select('*').order('created_at', { ascending: true }),
         sb.from('score_records').select('*'),
         sb.from('deduction_records').select('*'),
-        sb.from('settings').select('value').eq('key', 'sixDimRules').maybeSingle()
+        sb.from('settings').select('key,value,updated_at').in('key', ['sixDimRules', 'scoringRules'])
     ]);
     const results = { cadres: c, scoreRecords: sr, deductionRecords: dr };
     for (const k of Object.keys(results)) {
@@ -689,11 +688,13 @@ async function loadAll() {
         state[k] = results[k].data || [];
     }
     if (rs.error) throw new Error(rs.error.message);
-    if (rs.data && rs.data.value) {
+    // 兼容两个规则 key，取 updated_at 更新者
+    const rows = (rs.data || []).filter(r => r && r.value).sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+    for (const row of rows) {
         try {
-            const parsed = typeof rs.data.value === 'string' ? JSON.parse(rs.data.value) : rs.data.value;
-            if (parsed && parsed.dimensions) rules = parsed;
-        } catch (e) { /* 用默认规则 */ }
+            const parsed = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+            if (parsed && parsed.dimensions) { rules = parsed; break; }
+        } catch (e) { /* 继续尝试下一条 */ }
     }
 }
 
